@@ -26,12 +26,27 @@
 
     <profiles>
         <!-- Release profile: the Central Portal publisher picks up every module.
-             Sources, javadoc and GPG signing live in each module's release profile.
+             Sources and javadoc live in each module's release profile; the
+             aggregator POM is signed here because it is published too.
              See docs/DESIGN.md §12 and docs/RELEASE.md. -->
         <profile>
             <id>release</id>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.4</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>org.sonatype.central</groupId>
                         <artifactId>central-publishing-maven-plugin</artifactId>
