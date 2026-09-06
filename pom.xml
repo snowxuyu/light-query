@@ -11,6 +11,29 @@
 
     <name>light-query-parent</name>
     <description>Aggregator for the light-query core module and its Spring Boot starter.</description>
+    <url>https://github.com/snowxuyu/light-query</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>snowxuyu</id>
+            <name>snowxuyu</name>
+            <email>snowxuyu@gmail.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/snowxuyu/light-query</url>
+        <connection>scm:git:git://github.com/snowxuyu/light-query.git</connection>
+        <developerConnection>scm:git:ssh://github.com/snowxuyu/light-query.git</developerConnection>
+    </scm>
 
     <modules>
         <module>light-query</module>
