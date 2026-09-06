@@ -7,23 +7,13 @@
 ![JDK](https://img.shields.io/badge/JDK-21-blue)
 ![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)
 
-## 为什么是 light-query
-
-| | mybatis-dynamic-query | easy-query | **light-query** |
-|---|---|---|---|
-| API | FilterDescriptor 描述符 | 链式 lambda | 链式 lambda（MyBatis-Plus 风格） |
-| 编译期要求 | 无 | APT 生成代理 | **无**（运行时解析 lambda） |
-| 运行时依赖 | MyBatis + Jackson + commons-lang3 | 自研较多 | **仅 jakarta.persistence-api** |
-| 实体注解 | 自定义 | 自定义 | **JPA 标准注解** |
-| JDK | 8 | 8+ | 21 |
-
 ## 30 秒上手
 
 ```xml
 <dependency>
     <groupId>io.github.snowxuyu</groupId>
     <artifactId>light-query</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -168,7 +158,7 @@ LightQuery.setFillListener(new FillListener() {
 <dependency>
     <groupId>io.github.snowxuyu</groupId>
     <artifactId>light-query-spring-boot-starter</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
