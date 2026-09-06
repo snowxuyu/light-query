@@ -545,6 +545,38 @@ List<User> page2 = db.queryable(User.class).orderByAsc(User::getId).seekAfter(la
 - 前置校验：无 orderBy、值个数与排序列不符、值为 null、排序为聚合/别名 → SqlBuildException。
 - 深分页代价 O(1)（索引扫描），替代 offset 的 O(n) 扫描；语义上等价于全量排序后的窗口切片。
 
+### 5.14 update join / delete join（v0.3）
+
+```java
+// MySQL：UPDATE a JOIN b ON .. SET a.x = ?
+int rows = db.updatable(User.class)
+    .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
+    .set(User::getStatus, Status.FROZEN)
+    .gt(Order::getAmount, new BigDecimal("100"))
+    .execute();
+
+// delete join（@LogicDelete 实体自动转 UPDATE join；physical() 强转物理 DELETE）
+db.deletable(User.class)
+  .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
+  .gt(Order::getAmount, new BigDecimal("100"))
+  .execute();
+```
+
+契约（测试固化，见 T20）：
+
+- `Updatable.join(Class, Consumer<JoinOn>)` / `Deletable.join(...)`：INNER join（v0.3 不支持
+  LEFT/RIGHT join 写法），表不可重复 join；join 后条件可引用双方实体，`set(...)` 仍仅限目标实体
+  （否则 SqlBuildException）。未 join 实体的条件同样报错并提示。
+- 方言决定语句形态（`Dialect.updateJoinSql / deleteJoinSql` 接收预渲染片段自行拼装）：
+  - MySQL / MariaDB：`UPDATE a t0 JOIN b t1 ON .. SET t0.x = ?`；`DELETE t0 FROM a t0 JOIN b t1 ON ..`
+  - SQL Server：`UPDATE t0 SET .. FROM a t0 JOIN b t1 ON ..`；`DELETE t0 FROM a t0 JOIN b t1 ON ..`
+  - PostgreSQL：`UPDATE a t0 SET .. FROM b t1 WHERE ..`（ON 并入 WHERE）；`DELETE FROM a t0 USING b t1 WHERE ..`
+  - **Oracle / H2 不支持**：执行或 `toSql()` 时抛 `SqlBuildException` 并提示改用 IN 子查询
+- SET 子句中数值自增同样按方言限定列（MySQL/SQLServer `t0.x = t0.x + ?`，PG `x = x + ?`）。
+- 逻辑删除实体的 delete join 走 UPDATE join（置 deleted 标记）；`physical()` 强制物理 DELETE join。
+- `@Version` 不参与 fluent update/delete（与单表行为一致）。
+- `Updatable.toSql()` / `Deletable.toSql()`：调试渲染最终 SQL 与参数（消费 builder，不执行）。
+
 ---
 ## 6. SQL 生成规则（SqlBuilder + Dialect）
 
@@ -680,6 +712,7 @@ unchecked）——不新增自定义异常类型。
 | T17 | ProjectionH2Test | VO/record 投影：全列按名匹配（含下划线/大小写归一）、聚合别名、POJO setter、枚举与数值转换、分页投影、缺组件列报错（列出可用标签） |
 | T18 | SeekPaginationH2Test | seek 分页：单列/多列混合方向遍历不重不漏、与用户条件 AND、无 orderBy / 值个数不符 / null 值报错 |
 | T19 | DialectShapeTest | Oracle/SQLServer 方言：分页子句、引号、无 ORDER BY 时补中性排序、LIKE ESCAPE、SEQUENCE 语法、JDBC URL 探测 |
+| T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错 |
 
 覆盖率门禁：JaCoCo core 指令覆盖 ≥ 85%，`sqlgen`/`meta` 包 ≥ 90%。
 
@@ -744,5 +777,5 @@ light-query-parent/
 | 版本 | 内容 |
 |---|---|
 | v0.2（本轮已实现） | `@Version` 乐观锁、`SEQUENCE` 主键、自连接（QueryTable/TableColumn）、spring-boot-starter（SpringConnectionProvider 对接 Spring 事务）、字段自动填充监听器 SPI（FillListener） |
-| v0.3（进行中，分支 `dev/0.3.0`） | 已实现：VO/record 投影 select、seek 分页（逻辑分页）、Oracle/SQLServer 方言；待实现：达梦方言、审计拦截器 SPI、update join / delete join |
+| v0.3（进行中，分支 `dev/0.3.0`） | 已实现：VO/record 投影 select、seek 分页（逻辑分页）、Oracle/SQLServer 方言、update join / delete join；待实现：达梦方言、审计拦截器 SPI |
 | v1.0 | API 冻结、长期兼容承诺、性能基准报告（JMH）、多驱动兼容矩阵 |

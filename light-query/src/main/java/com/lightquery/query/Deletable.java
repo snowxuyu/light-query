@@ -8,9 +8,14 @@ import com.lightquery.lambda.SFunction;
 import com.lightquery.meta.ColumnMeta;
 import com.lightquery.query.model.ColumnRef;
 import com.lightquery.query.model.Condition;
+import com.lightquery.query.model.ConditionGroup;
+import com.lightquery.query.model.JoinSpec;
+import com.lightquery.query.model.JoinType;
 import com.lightquery.query.model.Operator;
 import com.lightquery.query.model.QueryModel;
+import com.lightquery.query.model.TableRef;
 import com.lightquery.sqlgen.SqlBuilder;
+import com.lightquery.sqlgen.SqlFragment;
 
 import java.util.Collection;
 import java.util.List;
@@ -33,6 +38,7 @@ public final class Deletable<T> {
     private final QueryExecutor executor;
     private final QueryModel model;
     private final Where<T> where;
+    private final ColumnResolver resolver;
 
     private boolean physical;
     private boolean allowFullTable;
@@ -41,18 +47,26 @@ public final class Deletable<T> {
     public Deletable(QueryExecutor executor, Class<T> entityClass) {
         this.executor = executor;
         this.model = new QueryModel(entityClass);
-        // deletes are single-table: every lambda must resolve to the root entity
-        ColumnResolver resolver = new ColumnResolver() {
+        // conditions may reference the root entity plus any joined table (see join(...))
+        this.resolver = new ColumnResolver() {
             @Override
             public ColumnResolver.Resolved resolve(SFunction<?, ?> lambda) {
+                Class<?> lambdaClass = LambdaUtils.getImplClass(lambda);
                 String property = LambdaUtils.getPropertyName(lambda);
-                ColumnMeta meta = Deletable.this.model.getRoot().getMeta().byProperty(property);
+                TableRef table = model.findTable(lambdaClass);
+                if (table == null) {
+                    throw new SqlBuildException(lambdaClass.getSimpleName()
+                            + " is not part of this delete. Join it with .join(...) first "
+                            + "or use properties of the deleted entity "
+                            + entityClass.getSimpleName() + ".");
+                }
+                ColumnMeta meta = table.getMeta().byProperty(property);
                 if (meta == null) {
-                    throw new SqlBuildException(entityClass.getSimpleName()
+                    throw new SqlBuildException(lambdaClass.getSimpleName()
                             + " has no mapped property '" + property + "'");
                 }
                 return new ColumnResolver.Resolved(
-                        new ColumnRef(entityClass, meta.getColumnName()), meta);
+                        new ColumnRef(table.getEntityClass(), meta.getColumnName()), meta);
             }
 
             @Override
@@ -60,7 +74,7 @@ public final class Deletable<T> {
                 throw new SqlBuildException("TableColumn needs a multi-table query — deletes are single-table; use the entity lambdas directly");
             }
 
-@Override
+            @Override
             public com.lightquery.query.model.Expr resolveAggregate(Aggregate aggregate) {
                 throw new SqlBuildException("Aggregates are only valid in queryable(...).having(...)");
             }
@@ -69,6 +83,23 @@ public final class Deletable<T> {
     }
 
     // ------------------------------------------------------------------ behaviour
+
+    /**
+     * Joins another table for filtering this delete (delete join). The join
+     * is an INNER join; its columns can be referenced from every condition.
+     * Whether the database supports DELETE with JOIN is decided by the
+     * dialect — MySQL/MariaDB and SQL Server render native multi-table
+     * syntax, PostgreSQL uses DELETE ... USING, Oracle and H2 do not support
+     * it. Logic delete remains an UPDATE (which then joins as well).
+     */
+    public <J> Deletable<T> join(Class<J> target, Consumer<JoinOn<J, T>> on) {
+        ensureOpen();
+        TableRef joined = model.addJoin(target);
+        ConditionGroup onGroup = new ConditionGroup();
+        on.accept(new JoinOn<>(onGroup, resolver));
+        model.getJoins().add(new JoinSpec(JoinType.INNER, joined, onGroup));
+        return this;
+    }
 
     /** Forces a physical DELETE even when the entity has a logic-delete column. */
     public Deletable<T> physical() {
@@ -200,23 +231,43 @@ public final class Deletable<T> {
 
     // ------------------------------------------------------------------ terminal
 
+    /** Renders and executes the DELETE (or the logic-delete UPDATE); returns the affected row count. */
     public int execute() {
         ensureOpen();
+        return executor.execute(buildDelete());
+    }
+
+    /** Debug rendering of the final DELETE SQL with its parameters; consumes the builder. */
+    public String toSql() {
+        ensureOpen();
+        SqlFragment fragment = buildDelete();
+        return fragment.sql() + " | params=" + fragment.params();
+    }
+
+    // ------------------------------------------------------------------ internals
+
+    private SqlFragment buildDelete() {
         if (model.getWhere().isEmpty() && !allowFullTable) {
             throw new SqlBuildException("DELETE without conditions would empty the whole table. "
                     + "Add a condition or call allowFullTable() to confirm.");
         }
         consumed = true;
         ColumnMeta logic = model.getRoot().getMeta().getLogicDeleteColumn();
-        int rows;
-        if (logic != null && !physical) {
+        boolean logicDelete = logic != null && !physical;
+        if (model.getJoins().isEmpty()) {
+            if (logicDelete) {
+                SqlBuilder.SetClause mark = SqlBuilder.SetClause.of(
+                        logic.getColumnName(), logic.deletedValueAsDb());
+                return SqlBuilder.update(model, List.of(mark), executor.dialect());
+            }
+            return SqlBuilder.delete(model, executor.dialect());
+        }
+        if (logicDelete) {
             SqlBuilder.SetClause mark = SqlBuilder.SetClause.of(
                     logic.getColumnName(), logic.deletedValueAsDb());
-            rows = executor.execute(SqlBuilder.update(model, List.of(mark), executor.dialect()));
-        } else {
-            rows = executor.execute(SqlBuilder.delete(model, executor.dialect()));
+            return SqlBuilder.updateWithJoin(model, List.of(mark), executor.dialect());
         }
-        return rows;
+        return SqlBuilder.deleteWithJoin(model, executor.dialect());
     }
 
     // ------------------------------------------------------------------ internals

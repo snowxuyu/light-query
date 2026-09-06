@@ -8,9 +8,14 @@ import com.lightquery.lambda.SFunction;
 import com.lightquery.meta.ColumnMeta;
 import com.lightquery.query.model.ColumnRef;
 import com.lightquery.query.model.Condition;
+import com.lightquery.query.model.ConditionGroup;
+import com.lightquery.query.model.JoinSpec;
+import com.lightquery.query.model.JoinType;
 import com.lightquery.query.model.Operator;
 import com.lightquery.query.model.QueryModel;
+import com.lightquery.query.model.TableRef;
 import com.lightquery.sqlgen.SqlBuilder;
+import com.lightquery.sqlgen.SqlFragment;
 
 import java.util.Collection;
 import java.util.List;
@@ -36,6 +41,7 @@ public final class Updatable<T> {
     private final QueryExecutor executor;
     private final QueryModel model;
     private final Where<T> where;
+    private final ColumnResolver resolver;
     private final List<SqlBuilder.SetClause> sets = new java.util.ArrayList<>();
 
     private boolean includeDeleted;
@@ -45,13 +51,26 @@ public final class Updatable<T> {
     public Updatable(QueryExecutor executor, Class<T> entityClass) {
         this.executor = executor;
         this.model = new QueryModel(entityClass);
-        // updates are single-table: every lambda must resolve to the root entity
-        ColumnResolver resolver = new ColumnResolver() {
+        // SET targets the updated entity; conditions may reference joined tables (see join(...))
+        this.resolver = new ColumnResolver() {
             @Override
             public ColumnResolver.Resolved resolve(SFunction<?, ?> lambda) {
-                ColumnMeta meta = Updatable.this.metaOf(lambda);
+                Class<?> lambdaClass = LambdaUtils.getImplClass(lambda);
+                String property = LambdaUtils.getPropertyName(lambda);
+                TableRef table = model.findTable(lambdaClass);
+                if (table == null) {
+                    throw new SqlBuildException(lambdaClass.getSimpleName()
+                            + " is not part of this update. Join it with .join(...) first "
+                            + "or use properties of the updated entity "
+                            + model.getRoot().getMeta().getEntityClass().getSimpleName() + ".");
+                }
+                ColumnMeta meta = table.getMeta().byProperty(property);
+                if (meta == null) {
+                    throw new SqlBuildException(lambdaClass.getSimpleName()
+                            + " has no mapped property '" + property + "'");
+                }
                 return new ColumnResolver.Resolved(
-                        new ColumnRef(entityClass, meta.getColumnName()), meta);
+                        new ColumnRef(table.getEntityClass(), meta.getColumnName()), meta);
             }
 
             @Override
@@ -59,12 +78,31 @@ public final class Updatable<T> {
                 throw new SqlBuildException("TableColumn needs a multi-table query — updates are single-table; use the entity lambdas directly");
             }
 
-@Override
+            @Override
             public com.lightquery.query.model.Expr resolveAggregate(Aggregate aggregate) {
                 throw new SqlBuildException("Aggregates are only valid in queryable(...).having(...)");
             }
         };
         this.where = new Where<>(model.getWhere(), resolver);
+    }
+
+    // ------------------------------------------------------------------ join
+
+    /**
+     * Joins another table for filtering this update (update join). The join
+     * is an INNER join; its columns can be referenced from every condition,
+     * while {@code set(...)} stays limited to the updated entity. Whether the
+     * database supports UPDATE with JOIN is decided by the dialect —
+     * MySQL/MariaDB and SQL Server render native join syntax, PostgreSQL
+     * uses UPDATE ... FROM, Oracle and H2 do not support it.
+     */
+    public <J> Updatable<T> join(Class<J> target, Consumer<JoinOn<J, T>> on) {
+        ensureOpen();
+        TableRef joined = model.addJoin(target);
+        ConditionGroup onGroup = new ConditionGroup();
+        on.accept(new JoinOn<>(onGroup, resolver));
+        model.getJoins().add(new JoinSpec(JoinType.INNER, joined, onGroup));
+        return this;
     }
 
     // ------------------------------------------------------------------ SET
@@ -211,8 +249,22 @@ public final class Updatable<T> {
 
     // ------------------------------------------------------------------ terminal
 
+    /** Renders and executes the UPDATE; returns the affected row count. */
     public int execute() {
         ensureOpen();
+        return executor.execute(buildUpdate());
+    }
+
+    /** Debug rendering of the final UPDATE SQL with its parameters; consumes the builder. */
+    public String toSql() {
+        ensureOpen();
+        SqlFragment fragment = buildUpdate();
+        return fragment.sql() + " | params=" + fragment.params();
+    }
+
+    // ------------------------------------------------------------------ internals
+
+    private SqlFragment buildUpdate() {
         if (sets.isEmpty()) {
             throw new SqlBuildException("UPDATE without any set(...) call — nothing to update");
         }
@@ -228,7 +280,9 @@ public final class Updatable<T> {
                         List.of(logic.normalValueAsDb())));
             }
         }
-        return executor.execute(SqlBuilder.update(model, sets, executor.dialect()));
+        return model.getJoins().isEmpty()
+                ? SqlBuilder.update(model, sets, executor.dialect())
+                : SqlBuilder.updateWithJoin(model, sets, executor.dialect());
     }
 
     // ------------------------------------------------------------------ internals
@@ -243,6 +297,13 @@ public final class Updatable<T> {
     }
 
     private ColumnMeta metaOf(SFunction<?, ?> col) {
+        Class<?> lambdaClass = LambdaUtils.getImplClass(col);
+        Class<?> rootClass = model.getRoot().getEntityClass();
+        if (!rootClass.isAssignableFrom(lambdaClass)) {
+            throw new SqlBuildException("set(...) modifies the updated entity only — '"
+                    + lambdaClass.getSimpleName()
+                    + "' columns are read-only here. Reference joined tables in conditions instead.");
+        }
         String property = LambdaUtils.getPropertyName(col);
         ColumnMeta meta = model.getRoot().getMeta().byProperty(property);
         if (meta == null) {

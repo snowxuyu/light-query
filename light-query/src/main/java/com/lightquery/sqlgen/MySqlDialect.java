@@ -21,4 +21,16 @@ public class MySqlDialect implements Dialect {
     public String likeEscapeClause() {
         return "";
     }
+
+    @Override
+    public String updateJoinSql(JoinPieces p) {
+        return "UPDATE " + p.rootDefinition() + " " + p.joinedTables()
+                + " SET " + p.setClauseQualified() + p.whereClause();
+    }
+
+    @Override
+    public String deleteJoinSql(JoinPieces p) {
+        return "DELETE " + p.alias() + " FROM " + p.rootDefinition() + " " + p.joinedTables()
+                + p.whereClause();
+    }
 }

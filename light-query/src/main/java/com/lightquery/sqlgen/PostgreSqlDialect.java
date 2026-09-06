@@ -31,4 +31,24 @@ public class PostgreSqlDialect implements Dialect {
     public String sequenceNextValueSql(String sequenceName) {
         return "SELECT nextval('" + sequenceName + "')";
     }
+
+    @Override
+    public String updateJoinSql(JoinPieces p) {
+        return "UPDATE " + p.rootDefinition() + " SET " + p.setClauseBare()
+                + " FROM " + p.joinTableList() + whereWithOn(p);
+    }
+
+    @Override
+    public String deleteJoinSql(JoinPieces p) {
+        return "DELETE FROM " + p.rootDefinition() + " USING " + p.joinTableList() + whereWithOn(p);
+    }
+
+    /** PostgreSQL UPDATE FROM / DELETE USING carry the ON conditions inside the WHERE clause. */
+    private String whereWithOn(JoinPieces p) {
+        if (p.onConditions().isEmpty()) {
+            return p.whereClause();
+        }
+        return p.whereClause().isEmpty() ? " WHERE " + p.onConditions()
+                : p.whereClause() + " AND " + p.onConditions();
+    }
 }

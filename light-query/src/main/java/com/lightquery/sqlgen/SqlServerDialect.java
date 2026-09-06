@@ -39,4 +39,16 @@ public class SqlServerDialect implements Dialect {
     public String sequenceNextValueSql(String sequenceName) {
         return "SELECT NEXT VALUE FOR " + quote(sequenceName);
     }
+
+    @Override
+    public String updateJoinSql(JoinPieces p) {
+        return "UPDATE " + p.alias() + " SET " + p.setClauseQualified() + " FROM "
+                + p.rootDefinition() + " " + p.joinedTables() + p.whereClause();
+    }
+
+    @Override
+    public String deleteJoinSql(JoinPieces p) {
+        return "DELETE " + p.alias() + " FROM " + p.rootDefinition() + " " + p.joinedTables()
+                + p.whereClause();
+    }
 }

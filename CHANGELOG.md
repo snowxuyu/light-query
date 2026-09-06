@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-column sort direction and composing with user conditions. Rejects
   missing orderBy, mismatched value counts and null values. Test matrix T18
   (`SeekPaginationH2Test`).
+- update join / delete join (v0.3 roadmap): `Updatable.join(...)` and
+  `Deletable.join(...)` join other tables for filtering. Statement shape is
+  dialect-driven (MySQL `UPDATE a JOIN b SET ..` / `DELETE t0 FROM ..`,
+  PostgreSQL `UPDATE .. FROM` / `DELETE .. USING`, SQL Server
+  `UPDATE alias SET .. FROM ..`); Oracle and H2 reject it with guidance.
+  `set(...)` stays limited to the updated entity; logic delete becomes an
+  UPDATE join. `toSql()` added to both builders for debugging. Test matrix
+  T20 (`UpdateJoinTest`).
 - Oracle (12c+) and SQL Server (2012+) dialects (v0.3 roadmap): quoting,
   OFFSET/FETCH pagination (neutral ORDER BY for SQL Server), LIKE ESCAPE and
   SEQUENCE support; JDBC URL auto-detection for both. Test matrix T19

@@ -91,6 +91,81 @@ public final class SqlBuilder {
         return ctx.toFragment(sql.toString());
     }
 
+    /**
+     * UPDATE that joins other tables for filtering (multi-table syntax).
+     * The model carries the joins; the statement shape is decided by the
+     * dialect (MySQL: {@code UPDATE a JOIN b ON .. SET ..} — PostgreSQL:
+     * {@code UPDATE a SET .. FROM b WHERE ..} — SQL Server:
+     * {@code UPDATE t0 SET .. FROM a JOIN b ..}).
+     */
+    public static SqlFragment updateWithJoin(QueryModel model, List<SetClause> sets, Dialect dialect) {
+        return updateOrDeleteWithJoin(model, sets, dialect, false);
+    }
+
+    /** DELETE that joins other tables for filtering (multi-table syntax). */
+    public static SqlFragment deleteWithJoin(QueryModel model, Dialect dialect) {
+        return updateOrDeleteWithJoin(model, List.of(), dialect, true);
+    }
+
+    private static SqlFragment updateOrDeleteWithJoin(QueryModel model, List<SetClause> sets,
+                                                      Dialect dialect, boolean delete) {
+        if (sets.isEmpty() && !delete) {
+            throw new SqlBuildException("UPDATE requires at least one SET clause");
+        }
+        RenderContext ctx = new RenderContext(dialect);
+        Scope scope = Scope.root(model, 0);
+        String alias = dialect.quote(scope.aliasOf(model.getRoot()));
+        String rootDefinition = dialect.quote(model.getRoot().getTableName()) + " " + alias;
+
+        StringBuilder joinedTables = new StringBuilder();
+        StringBuilder joinTableList = new StringBuilder();
+        StringBuilder onConditions = new StringBuilder();
+        for (JoinSpec join : model.getJoins()) {
+            String joinAlias = dialect.quote(scope.aliasOf(join.table()));
+            if (joinedTables.length() > 0) {
+                joinedTables.append(' ');
+            }
+            joinedTables.append(join.type().text()).append(' ')
+                    .append(dialect.quote(join.table().getTableName())).append(' ').append(joinAlias)
+                    .append(" ON ").append(renderGroup(join.on(), scope, ctx, 0));
+            if (joinTableList.length() > 0) {
+                joinTableList.append(", ");
+            }
+            joinTableList.append(dialect.quote(join.table().getTableName())).append(' ').append(joinAlias);
+            if (onConditions.length() > 0) {
+                onConditions.append(" AND ");
+            }
+            onConditions.append(renderGroup(join.on(), scope, ctx, 0));
+        }
+
+        StringBuilder qualifiedSets = new StringBuilder();
+        StringBuilder bareSets = new StringBuilder();
+        for (int i = 0; i < sets.size(); i++) {
+            if (i > 0) {
+                qualifiedSets.append(", ");
+                bareSets.append(", ");
+            }
+            SetClause set = sets.get(i);
+            String bareColumn = dialect.quote(set.column());
+            String qualifiedColumn = alias + "." + bareColumn; // alias is already quoted
+            if (set.increment()) {
+                qualifiedSets.append(qualifiedColumn).append(" = ").append(qualifiedColumn).append(" + ?");
+                bareSets.append(bareColumn).append(" = ").append(bareColumn).append(" + ?");
+            } else {
+                qualifiedSets.append(qualifiedColumn).append(" = ?");
+                bareSets.append(bareColumn).append(" = ?");
+            }
+            ctx.params().add(set.value());
+        }
+
+        String whereClause = renderWhere(model.getWhere(), scope, ctx, 0).toString();
+        Dialect.JoinPieces pieces = new Dialect.JoinPieces(alias, rootDefinition,
+                joinedTables.toString(), joinTableList.toString(), onConditions.toString(),
+                qualifiedSets.toString(), bareSets.toString(), whereClause);
+        String sql = delete ? dialect.deleteJoinSql(pieces) : dialect.updateJoinSql(pieces);
+        return ctx.toFragment(sql);
+    }
+
     public static SqlFragment insert(String table, List<String> columns, List<Object> values, Dialect dialect) {
         if (columns.isEmpty()) {
             throw new SqlBuildException("INSERT requires at least one column");
