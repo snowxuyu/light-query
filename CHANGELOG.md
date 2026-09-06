@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-06
+
 ### Added
 - Multi-datasource support through the static facade: `LightQuery.primary(ds)`
   registers the primary data source (the default target of every static call);
