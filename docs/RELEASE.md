@@ -19,8 +19,8 @@
 # 0. 确认 main 分支 CI 全绿
 # 1. 更新 CHANGELOG.md（把 Unreleased 改成版本号与日期）
 # 2. 版本收口
-mvn release:prepare -DreleaseVersion=0.1.0 -Dtag=v0.1.0 -DdevelopmentVersion=0.2.0-SNAPSHOT
-# 或手动：修改 pom version → 提交 → 打 tag v0.1.0
+mvn release:prepare -DreleaseVersion=0.2.0 -Dtag=v0.2.0 -DdevelopmentVersion=0.3.0-SNAPSHOT
+# 或手动：修改各模块 version（parent + modules 同步）→ 提交 → 打 tag v0.2.0
 
 # 3. push tag 触发 release.yml；或手动执行
 mvn -Prelease deploy

@@ -6,6 +6,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Multi-datasource support through the static facade: `LightQuery.primary(ds)`
+  registers the primary data source (the default target of every static call);
+  `LightQuery.datasource(name, ds)` registers named ones with get-or-register
+  semantics (same name + same DataSource resolve to the same cached session).
+  Call sites name the datasource explicitly:
+  `LightQuery.datasource("order", dsOrder).queryable(...)` or
+  `LightQuery.datasource("order").queryable(...)`. Switching is always
+  explicit — no automatic routing. With a single data source nothing needs to
+  be specified: `LightQuery.queryable(...)` targets the primary. Dialects are
+  detected per data source at first registration (explicit-dialect overloads
+  available); `LightQuery.reset()` clears the registry for tests. Test matrix
+  T11 (`MultiDataSourceH2Test`).
+- `@Version` optimistic locking (v0.2 roadmap): numeric versions
+  (int/Integer/long/Long) participate in entity-level `update` /
+  `updateSelective` / `delete` — the WHERE gains the expected version and the
+  SET gains an increment; a conflict raises
+  `jakarta.persistence.OptimisticLockException` and the new version is
+  back-filled into the entity. Inserts initialise a null version to 0.
+  Fluent `Updatable`/`Deletable` and `deleteById` do not participate
+  automatically. Test matrix T12 (`OptimisticLockH2Test`).
+- SEQUENCE key generation (v0.2 roadmap): `@GeneratedValue(strategy=SEQUENCE)`
+  with a `@SequenceGenerator` fetches `nextval` per entity before the INSERT
+  (single and batch); supported by the PostgreSQL and H2 dialects, rejected on
+  MySQL. Test matrix T13 (`SequenceH2Test`).
+- Self-joins via `QueryTable.of(entity, alias)` and occurrence-bound
+  `TableColumn`s (v0.2 roadmap): join the same entity several times under
+  explicit aliases, address columns with `table.col(Entity::getProperty)`;
+  plain lambdas on a duplicated entity fail with guidance. Test matrix T14
+  (`SelfJoinH2Test`).
+- `FillListener` SPI for entity field auto-filling (v0.2 roadmap): global
+  `LightQuery.setFillListener(...)` callbacks fire before the SQL of
+  `insert` / `insertBatch` / `update` / `updateSelective` is built. Test
+  matrix T15 (`FillListenerH2Test`).
+
+### Changed
+- **Two-module build (0.2.0-SNAPSHOT):** the repository is now an aggregator
+  (`light-query-parent`) with the core in `light-query/` and a new
+  `light-query-spring-boot-starter/` module (Boot 3.x auto-configuration,
+  `SpringConnectionProvider` for Spring-managed transactions). Dependency
+  coordinates of the core artifact are unchanged. Test matrix T16
+  (`SpringStarterTest`).
+- **Static facade split:** `LightQuery` is now a stateless static entry point —
+  register once at startup, then call `LightQuery.queryable(...)` /
+  `LightQuery.insert(...)` / `LightQuery.inTransaction(...)` directly. The
+  former immutable instance class moved to `LightQuerySession` (returned by
+  `datasource(...)`/`of(...)`, handed to `inTransaction` work); the earlier
+  `builder()` bootstrap and instance-level `of(String)` switching are replaced
+  by the facade registry.
+- **Breaking renames for naming-standard compliance (Alibaba Java Coding
+  Guidelines — no opaque abbreviations):** aggregate factory `F` →
+  `Aggregations`; aggregate handle `Agg` → `Aggregate` (record components
+  `func`/`fn` → `function`/`property`); operator enum `Op` → `Operator`
+  (`Condition.getOp()` → `getOperator()`). Internal identifiers renamed
+  accordingly: `Expr.func/arg` → `Expr.function/argument`, `Ctx` →
+  `RenderContext`, `resolveAgg` → `resolveAggregate`.
+- `Tuple` no longer takes a `Map` in its constructor — maps are kept out of
+  the public API surface. `new Tuple(labels, values)` builds the label index
+  internally; duplicate labels keep the first occurrence (same semantics as
+  before).
+
 ## [0.1.0] — first public milestone
 
 ### Added
