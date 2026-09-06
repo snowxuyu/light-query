@@ -25,6 +25,12 @@ public final class Dialects {
         if (urlLower.contains(":h2:")) {
             return new H2Dialect();
         }
+        if (urlLower.contains(":oracle:")) {
+            return new OracleDialect();
+        }
+        if (urlLower.contains(":sqlserver:")) {
+            return new SqlServerDialect();
+        }
         throw new LightQueryException("Cannot detect a dialect from JDBC URL '" + url
                 + "'. Call LightQuery.of(dataSource, dialect) with an explicit Dialect, "
                 + "e.g. new MySqlDialect().");

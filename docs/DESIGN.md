@@ -336,6 +336,9 @@ public final class Queryable<T> {
     Number sum(SFunction<?,?> col); Number avg(...); Number max(...); Number min(...);
     PageResult<T> toPageResult(long pageNo, long pageSize);  // pageNo 从 1 开始
     List<Tuple> toTupleList();                       // 投影/分组查询结果
+    <R> List<R> toList(Class<R> projectionType);     // VO/record 投影（§5.12），名字忽略大小写与下划线匹配
+    <R> PageResult<R> toPageResult(long pageNo, long pageSize, Class<R> projectionType); // 投影分页
+    Queryable<T> seekAfter(Object... values);        // keyset 逻辑分页（§5.13），值与排序列一一对应
     String toSql();                                  // 调试用：返回 SQL 与参数（不打日志不执行）
 }
 ```
@@ -498,8 +501,51 @@ public interface FillListener {
   为 true 时会话的 `inTransaction` 不再自行 commit/rollback（交由外部事务管理器）。
 - 多 `DataSource` 候选时不自动装配（`@ConditionalOnSingleCandidate`），按 §5.0 手动注册。
 
----
+### 5.12 VO / record 投影（v0.3）
 
+```java
+record OrderStat(Long userId, Long orderCount, BigDecimal totalAmount) {}
+
+List<OrderStat> rows = db.queryable(Order.class)
+    .select(Order::getUserId)
+    .select(Aggregations.count().as("orderCount"),
+            Aggregations.sum(Order::getAmount).as("totalAmount"))
+    .groupBy(Order::getUserId)
+    .toList(OrderStat.class);
+
+PageResult<UserRow> page = db.queryable(User.class)
+    .orderByAsc(User::getId)
+    .toPageResult(1, 20, UserRow.class);
+```
+
+契约（测试固化，见 T17）：
+
+- 终端方法 `toList(Class<R>)` / `toPageResult(pageNo, pageSize, Class<R>)`：使用当前 select 列表；
+  未调用 `select(...)` 时取根实体全部列（`SELECT *`）。
+- 映射按名字匹配：record 组件名 / VO 属性名与结果集标签**忽略大小写与下划线**等价
+  （`userName` ≍ `user_name`）；聚合投影必须用 `.as(alias)` 提供同名列。
+- record 走规范构造器；VO 需要无参构造器 + setter。类型自动转换（数值家族、字符串、枚举、时间类型）。
+- 组件在结果集中找不到对应标签 → MappingException，消息列出可用标签；结果集多余列忽略。
+- 投影计划按类型缓存（ConcurrentHashMap，写路径只发生一次）。
+
+### 5.13 seek 逻辑分页（keyset，v0.3）
+
+```java
+// 首页
+List<User> page1 = db.queryable(User.class).orderByAsc(User::getId).limit(20).toList();
+// 下一页：以上一页最后一行的排序列值作为游标（不再使用 offset）
+List<User> page2 = db.queryable(User.class).orderByAsc(User::getId).seekAfter(lastId).limit(20).toList();
+```
+
+契约（测试固化，见 T18）：
+
+- `seekAfter(values...)` 的值与此前 `orderByAsc/orderByDesc` 的排序列一一对应，按列方向渲染
+  `>` / `<` 的嵌套 OR 等价谓词（`(a > ?) OR (a = ? AND b < ?)`），天然支持多列、混合方向。
+- 谓词作为**一个整体分组**与用户条件 AND；与逻辑删过滤共存。
+- 前置校验：无 orderBy、值个数与排序列不符、值为 null、排序为聚合/别名 → SqlBuildException。
+- 深分页代价 O(1)（索引扫描），替代 offset 的 O(n) 扫描；语义上等价于全量排序后的窗口切片。
+
+---
 ## 6. SQL 生成规则（SqlBuilder + Dialect）
 
 ### 6.1 别名规则（join 与子查询的正确性根基）
@@ -533,6 +579,15 @@ public interface FillListener {
 | like ESCAPE 子句 | 依赖默认 `\`，不输出 | 显式输出 `ESCAPE '\'` | 显式输出 |
 | SEQUENCE nextval | ❌（抛 SqlBuildException） | `SELECT nextval('seq')` | `SELECT NEXT VALUE FOR "seq"` |
 | upsert / 序列等 | roadmap | roadmap | roadmap |
+
+v0.3 起新增方言（§5.11 同款探测规则，按 JDBC 子协议 `:oracle:` / `:sqlserver:`）：
+
+| 能力 | Oracle (12c+) | SQL Server (2012+) |
+|---|---|---|
+| 引号 | `"id"`（双引号） | `[id]`（方括号，`]` 双写） |
+| 分页 | `OFFSET n ROWS FETCH NEXT m ROWS ONLY` | 同左；无 ORDER BY 时自动补 `ORDER BY (SELECT NULL)` |
+| LIKE ESCAPE | 显式 `ESCAPE '\'` | 显式 `ESCAPE '\'` |
+| SEQUENCE | `SELECT "seq".NEXTVAL FROM DUAL` | `SELECT NEXT VALUE FOR [seq]` |
 
 ### 6.4 生成 SQL 样例（快照测试基准）
 
@@ -622,6 +677,9 @@ unchecked）——不新增自定义异常类型。
 | T14 | SelfJoinH2Test | 自连接：同实体多次 join 显式别名、TableColumn 条件/投影/排序、未注册 occurrence 报错、重复实体 lambda 条件报错（提示 TableColumn）、重复别名/保留别名拒绝、逻辑删过滤只在根表 |
 | T15 | FillListenerH2Test | 填充 SPI：insert/update 回调、批量逐实体回调、未注册时无副作用、监听器异常原样传播 |
 | T16 | SpringStarterTest | starter：自动装配 LightQuerySession Bean + 门面主库注册、Spring 事务内语句复用绑定连接（rollback 生效）、无事务时逐操作连接、自定义 Bean 跳过自动装配 |
+| T17 | ProjectionH2Test | VO/record 投影：全列按名匹配（含下划线/大小写归一）、聚合别名、POJO setter、枚举与数值转换、分页投影、缺组件列报错（列出可用标签） |
+| T18 | SeekPaginationH2Test | seek 分页：单列/多列混合方向遍历不重不漏、与用户条件 AND、无 orderBy / 值个数不符 / null 值报错 |
+| T19 | DialectShapeTest | Oracle/SQLServer 方言：分页子句、引号、无 ORDER BY 时补中性排序、LIKE ESCAPE、SEQUENCE 语法、JDBC URL 探测 |
 
 覆盖率门禁：JaCoCo core 指令覆盖 ≥ 85%，`sqlgen`/`meta` 包 ≥ 90%。
 
@@ -686,5 +744,5 @@ light-query-parent/
 | 版本 | 内容 |
 |---|---|
 | v0.2（本轮已实现） | `@Version` 乐观锁、`SEQUENCE` 主键、自连接（QueryTable/TableColumn）、spring-boot-starter（SpringConnectionProvider 对接 Spring 事务）、字段自动填充监听器 SPI（FillListener） |
-| v0.3 | Oracle/SQLServer/达梦方言、seek 分页（逻辑分页）、VO/record 投影 select、审计拦截器 SPI、update join / delete join |
+| v0.3（进行中，分支 `dev/0.3.0`） | 已实现：VO/record 投影 select、seek 分页（逻辑分页）、Oracle/SQLServer 方言；待实现：达梦方言、审计拦截器 SPI、update join / delete join |
 | v1.0 | API 冻结、长期兼容承诺、性能基准报告（JMH）、多驱动兼容矩阵 |

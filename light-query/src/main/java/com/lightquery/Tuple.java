@@ -1,8 +1,11 @@
 package com.lightquery;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * One row of a projected/grouped query (see {@code Queryable#toTupleList()}).
@@ -17,8 +20,11 @@ public final class Tuple {
 
     /** Builds a tuple; when a label repeats, the first occurrence wins. */
     public Tuple(List<String> labels, List<Object> values) {
+        Objects.requireNonNull(labels, "labels");
+        Objects.requireNonNull(values, "values");
         this.labels = List.copyOf(labels);
-        this.values = List.copyOf(values);
+        // values may contain NULL column values — use a null-tolerant list
+        this.values = Collections.unmodifiableList(new ArrayList<>(values));
         if (this.labels.size() != this.values.size()) {
             throw new IllegalArgumentException("labels and values must have the same size, got "
                     + this.labels.size() + "/" + this.values.size());

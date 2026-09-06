@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- VO/record projection (v0.3 roadmap): `toList(Class<R>)` and
+  `toPageResult(pageNo, pageSize, Class<R>)` map projected rows onto
+  Java records (canonical constructor) or VO classes (setters). Components
+  are matched to result-set labels by name ignoring case and underscores;
+  values are coerced to the target types; plans are cached per type.
+  Test matrix T17 (`ProjectionH2Test`).
+- Keyset (seek) pagination (v0.3 roadmap): `seekAfter(values...)` adds the
+  predicate matching everything after the given sort-key values, honouring
+  per-column sort direction and composing with user conditions. Rejects
+  missing orderBy, mismatched value counts and null values. Test matrix T18
+  (`SeekPaginationH2Test`).
+- Oracle (12c+) and SQL Server (2012+) dialects (v0.3 roadmap): quoting,
+  OFFSET/FETCH pagination (neutral ORDER BY for SQL Server), LIKE ESCAPE and
+  SEQUENCE support; JDBC URL auto-detection for both. Test matrix T19
+  (`DialectShapeTest`).
+
+### Fixed
+- `Tuple` no longer fails with NullPointerException when a projected column
+  value is SQL NULL (regression introduced with the Map-free constructor).
+
 ## [0.2.0] — 2026-09-06
 
 ### Added

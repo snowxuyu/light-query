@@ -8,6 +8,7 @@ import com.lightquery.Tuple;
 import com.lightquery.exception.MappingException;
 import com.lightquery.exception.SqlBuildException;
 import com.lightquery.exec.JdbcExecutor;
+import com.lightquery.exec.RowProjector;
 import com.lightquery.lambda.LambdaUtils;
 import com.lightquery.lambda.SFunction;
 import com.lightquery.meta.ColumnMeta;
@@ -26,6 +27,7 @@ import com.lightquery.sqlgen.SqlBuilder;
 import com.lightquery.sqlgen.SqlFragment;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
@@ -719,6 +721,133 @@ public final class Queryable<T> {
         model.setLimit(pageSize);
         List<T> rows = executeList();
         return PageResult.of(rows, total, pageNo, pageSize);
+    }
+
+    /**
+     * Projected result rows mapped onto a VO class or Java record: record
+     * components / VO properties are matched to result-set labels by name,
+     * ignoring case and underscores. Uses the current select list — without
+     * one, all root columns are selected.
+     */
+    public <R> List<R> toList(Class<R> projectionType) {
+        ensureOpen();
+        prepare();
+        List<Tuple> tuples = executor.query(SqlBuilder.select(model, executor.dialect()),
+                JdbcExecutor.tupleMapper());
+        RowProjector<R> projector = RowProjector.of(projectionType);
+        List<R> rows = new ArrayList<>(tuples.size());
+        for (Tuple tuple : tuples) {
+            rows.add(projector.project(tuple));
+        }
+        return rows;
+    }
+
+    /**
+     * Offset pagination mapped onto a VO class or Java record
+     * (see {@link #toList(Class)}); {@code pageNo} starts at 1.
+     */
+    public <R> PageResult<R> toPageResult(long pageNo, long pageSize, Class<R> projectionType) {
+        ensureOpen();
+        if (pageNo < 1 || pageSize < 1) {
+            throw new IllegalArgumentException("pageNo and pageSize must be >= 1, got "
+                    + pageNo + "/" + pageSize);
+        }
+        prepare();
+        long total = executor.count(SqlBuilder.count(model, executor.dialect()));
+        model.setOffset((pageNo - 1) * pageSize);
+        model.setLimit(pageSize);
+        List<Tuple> tuples = executor.query(SqlBuilder.select(model, executor.dialect()),
+                JdbcExecutor.tupleMapper());
+        RowProjector<R> projector = RowProjector.of(projectionType);
+        List<R> rows = new ArrayList<>(tuples.size());
+        for (Tuple tuple : tuples) {
+            rows.add(projector.project(tuple));
+        }
+        return PageResult.of(rows, total, pageNo, pageSize);
+    }
+
+    /**
+     * Keyset (seek) pagination: adds the predicate that matches everything
+     * strictly after the given sort-key values, so the next page is fetched
+     * with {@code limit(...)} instead of a costly deep {@code offset}. The
+     * values correspond 1:1 to the columns of the previous
+     * {@code orderByAsc/orderByDesc} call, honouring each column's direction;
+     * all values must be non-null. Call it after the order and the user
+     * conditions are set, then finish with a terminal method.
+     *
+     * <pre>{@code
+     * // page 1:  orderByAsc(User::getId).limit(20).toList()
+     * // page 2:  .orderByAsc(User::getId).seekAfter(lastId).limit(20).toList()
+     * }</pre>
+     *
+     * @throws SqlBuildException without a preceding orderBy, when the value
+     *         count does not match the sort columns, when a value is null, or
+     *         when the sort uses an aggregate/alias expression
+     */
+    public Queryable<T> seekAfter(Object... values) {
+        ensureOpen();
+        List<OrderBy> orders = model.getOrderBys();
+        if (orders.isEmpty()) {
+            throw new SqlBuildException("seekAfter(...) requires an orderByAsc/orderByDesc first — "
+                    + "keyset pagination walks an ordered result");
+        }
+        int expected = orders.size();
+        int actual = values == null ? 0 : values.length;
+        if (actual != expected) {
+            throw new SqlBuildException("seekAfter expects " + expected + " value(s) matching the "
+                    + "sort columns, got " + actual);
+        }
+        ConditionGroup seek = new ConditionGroup();
+        for (int i = 0; i < expected; i++) {
+            OrderBy order = orders.get(i);
+            if (!(order instanceof OrderBy.ByExpr byExpr)
+                    || !(byExpr.expr() instanceof ColumnRef ref)) {
+                throw new SqlBuildException("seekAfter(...) needs plain column orderBy — aggregates "
+                        + "and alias-based ordering cannot be used as a seek key");
+            }
+            TableRef table = ref.tableAlias() != null
+                    ? model.findTableByAlias(ref.tableAlias())
+                    : model.findTable(ref.entity());
+            if (table == null) {
+                throw new SqlBuildException("Column '" + ref.column() + "' is not part of this query "
+                        + "and cannot be used as a seek key");
+            }
+            ColumnMeta meta = table.getMeta().byColumn(ref.column());
+            Object dbValue = meta == null ? values[i] : meta.toDbValue(values[i]);
+            if (dbValue == null) {
+                throw new SqlBuildException("seekAfter value " + i + " must not be null — keyset "
+                        + "pagination cannot compare NULL sort keys");
+            }
+            ConditionGroup prefix = new ConditionGroup();
+            for (int j = 0; j < i; j++) {
+                ColumnRef earlier = columnRefOf(orders.get(j));
+                ColumnMeta earlierMeta = metaOf(earlier);
+                Object earlierValue = earlierMeta == null ? values[j] : earlierMeta.toDbValue(values[j]);
+                prefix.add(Condition.of(earlier, Operator.EQ, List.of(earlierValue)));
+            }
+            prefix.add(Condition.of(ref, byExpr.asc() ? Operator.GT : Operator.LT, List.of(dbValue)));
+            if (i > 0) {
+                seek.or();
+            }
+            seek.add(prefix);
+        }
+        model.getWhere().add(seek);
+        return this;
+    }
+
+    private ColumnRef columnRefOf(OrderBy order) {
+        if (order instanceof OrderBy.ByExpr byExpr && byExpr.expr() instanceof ColumnRef ref) {
+            return ref;
+        }
+        throw new SqlBuildException("seekAfter(...) needs plain column orderBy — aggregates "
+                + "and alias-based ordering cannot be used as a seek key");
+    }
+
+    private ColumnMeta metaOf(ColumnRef ref) {
+        TableRef table = ref.tableAlias() != null
+                ? model.findTableByAlias(ref.tableAlias())
+                : model.findTable(ref.entity());
+        return table == null ? null : table.getMeta().byColumn(ref.column());
     }
 
     /** Projected/grouped result rows (labels: column names or aliases). */
