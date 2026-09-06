@@ -1,0 +1,99 @@
+package com.lightquery;
+
+import com.lightquery.entity.User;
+import com.lightquery.exception.SqlBuildException;
+import com.lightquery.support.TestDb;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** T9 — misuse protection and injection safety. */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class SafetyTest {
+
+    private TestDb h2;
+
+    @BeforeAll
+    void setUp() {
+        h2 = new TestDb("safety");
+        h2.db.insert(h2.user("safe", User.Status.ACTIVE, 1, null, null, 0));
+    }
+
+    @Test
+    void updateWithoutConditionsIsRejected() {
+        SqlBuildException e = assertThrows(SqlBuildException.class,
+                () -> h2.db.updatable(User.class).set(User::getAge, 1).execute());
+        assertTrue(e.getMessage().contains("allowFullTable"));
+    }
+
+    @Test
+    void deleteWithoutConditionsIsRejected() {
+        assertThrows(SqlBuildException.class,
+                () -> h2.db.deletable(User.class).execute());
+    }
+
+    @Test
+    void allowFullTableIsTheExplicitEscapeHatch() {
+        int rows = h2.db.updatable(User.class)
+                .set(User::getRemark, "bulk")
+                .allowFullTable()
+                .execute();
+        assertTrue(rows >= 1);
+    }
+
+    @Test
+    void primaryKeysCannotBeModifiedViaSet() {
+        assertThrows(SqlBuildException.class,
+                () -> h2.db.updatable(User.class).set(User::getId, 1L).allowFullTable().execute());
+    }
+
+    @Test
+    void consumedQueryableIsRejected() {
+        var query = h2.db.queryable(User.class);
+        query.count();
+        assertThrows(SqlBuildException.class, query::count);
+    }
+
+    @Test
+    void updateEntityWithoutSetIsRejected() {
+        assertThrows(SqlBuildException.class,
+                () -> h2.db.updatable(User.class).allowFullTable().execute());
+    }
+
+    @Test
+    void injectionPayloadsStayBound() {
+        String payload = "x'; DROP TABLE t_user; --";
+        h2.db.insert(h2.user(payload, User.Status.ACTIVE, 1, null, null, 0));
+        // value matched literally, table still intact
+        assertEquals(1, h2.db.queryable(User.class).eq(User::getName, payload).count());
+        assertTrue(h2.db.queryable(User.class).count() > 0);
+    }
+
+    @Test
+    void likeWildcardsInPayloadCannotWidenPattern() {
+        String payload = "100%_match";
+        h2.db.insert(h2.user(payload, User.Status.ACTIVE, 2, null, null, 0));
+        assertEquals(1, h2.db.queryable(User.class).like(User::getName, "100%_match").count());
+    }
+
+    @Test
+    void invalidPageParametersAreRejected() {
+        assertThrows(IllegalArgumentException.class,
+                () -> h2.db.queryable(User.class).toPageResult(0, 10));
+        assertThrows(IllegalArgumentException.class,
+                () -> h2.db.queryable(User.class).toPageResult(1, 0));
+    }
+
+    @Test
+    void unknownPropertyIsRejected() {
+        assertThrows(com.lightquery.exception.MappingException.class,
+                () -> h2.db.queryable(User.class).in(User::getIgnored, List.of("x")));
+    }
+}
