@@ -691,7 +691,7 @@ unchecked）——不新增自定义异常类型。
 |---|---|---|
 | T1 | EntityMetaTest | 命名转换（含连续大写）、注解组合、枚举两种策略、无主键/重复列/非法组合报错、复合主键 |
 | T2 | LambdaUtilsTest | getXxx/isXxx、非 getter 报错、缓存生效 |
-| T3 | SqlSnapshotMySqlTest / SqlSnapshotPostgreSqlTest | §5 全部方法生成 SQL 逐条快照：全操作符、or() 链、嵌套分组、null 语义、空 IN、join 别名与 ON、相关/非相关子查询、标量子查询、groupBy+having、count 子查询、分页子句、forUpdate、distinct、投影+as、like ESCAPE、动态表名 |
+| T3 | SqlSnapshotTest | §5 全部方法生成 SQL 逐条快照（MySQL 与 PostgreSQL 双方言断言）：全操作符、or() 链、嵌套分组、null 语义、空 IN、join 别名与 ON、相关/非相关子查询、标量子查询、groupBy+having、count 子查询、分页子句、forUpdate、distinct、投影+as、like ESCAPE、动态表名 |
 | T4 | CrudH2Test | insert/回填/批量/selective、queryById、update/delete 实体（行数≠1 异常）、count |
 | T5 | QueryH2Test | 操作符行为验证（不只是 SQL 形状）、分页 totals、Tuple 投影、标量聚合边界（空表 max=null、sum=0） |
 | T6 | JoinSubqueryH2Test | join 语义（inner/left 差异、行重复为标准 SQL 行为）、列对列条件、in 子查询、标量子查询、相关 exists |
@@ -708,7 +708,8 @@ unchecked）——不新增自定义异常类型。
 | T17 | ProjectionH2Test | VO/record 投影：全列按名匹配（含下划线/大小写归一）、聚合别名、POJO setter、枚举与数值转换、分页投影、缺组件列报错（列出可用标签） |
 | T18 | SeekPaginationH2Test | seek 分页：单列/多列混合方向遍历不重不漏、与用户条件 AND、无 orderBy / 值个数不符 / null 值报错 |
 | T19 | DialectShapeTest | Oracle/SQLServer 方言：分页子句、引号、无 ORDER BY 时补中性排序、LIKE ESCAPE、SEQUENCE 语法、JDBC URL 探测 |
-| T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错 |
+| T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照（逗号风格 FROM 列表，ON 并入 WHERE）、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错 |
+| T21 | StrongTypingTest | 强类型分层：col/cmpCol/strCol/numCol 四层在 H2 的正例执行（相等/比较/文本/数值、join 列对列、聚合终端、updatable 各层、JoinOn 常量族）；断言与执行顺序无关；编不过的负例以文档注释固化（见类头 javadoc） |
 
 覆盖率门禁：JaCoCo core 指令覆盖 ≥ 85%，`sqlgen`/`meta` 包 ≥ 90%。
 

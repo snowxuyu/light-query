@@ -27,6 +27,7 @@ public class UpdatableStringColumn<T> extends UpdatableComparableColumn<T, Strin
         return updatable;
     }
 
+    /** Text columns only: negated contains match with {@code \ % _} escaped. */
     public Updatable<T> notLike(String contains) {
         group.add(Condition.of(ref, Operator.NOT_LIKE, Collections.singletonList(Escape.contains(contains))));
         return updatable;

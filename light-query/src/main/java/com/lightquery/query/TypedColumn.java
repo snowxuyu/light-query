@@ -87,11 +87,13 @@ public class TypedColumn<B, V> {
         return notIn(Arrays.asList(values));
     }
 
+    /** {@code col IS NULL}. */
     public B isNull() {
         group.add(Condition.of(ref, Operator.IS_NULL, null));
         return builder;
     }
 
+    /** {@code col IS NOT NULL}. */
     public B isNotNull() {
         group.add(Condition.of(ref, Operator.IS_NOT_NULL, null));
         return builder;
@@ -130,22 +132,27 @@ public class TypedColumn<B, V> {
         return subQueryCondition(Operator.EQ, subQuery);
     }
 
+    /** Scalar sub-query comparison: {@code col <> (SELECT ...)}. */
     public B neSubQuery(Queryable<?> subQuery) {
         return subQueryCondition(Operator.NE, subQuery);
     }
 
+    /** Scalar sub-query comparison: {@code col > (SELECT ...)}. */
     public B gtSubQuery(Queryable<?> subQuery) {
         return subQueryCondition(Operator.GT, subQuery);
     }
 
+    /** Scalar sub-query comparison: {@code col >= (SELECT ...)}. */
     public B geSubQuery(Queryable<?> subQuery) {
         return subQueryCondition(Operator.GE, subQuery);
     }
 
+    /** Scalar sub-query comparison: {@code col < (SELECT ...)}. */
     public B ltSubQuery(Queryable<?> subQuery) {
         return subQueryCondition(Operator.LT, subQuery);
     }
 
+    /** Scalar sub-query comparison: {@code col <= (SELECT ...)}. */
     public B leSubQuery(Queryable<?> subQuery) {
         return subQueryCondition(Operator.LE, subQuery);
     }

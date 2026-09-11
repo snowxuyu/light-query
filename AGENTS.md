@@ -22,7 +22,7 @@ light-query：面向 Java 21 的低学习成本、类型安全轻量 ORM。
 
 ```bash
 # 需要 JDK 21
-mvn verify        # 全量构建 + 82 个测试（T1-T10 矩阵）
+mvn verify        # 全量构建 + 157 个测试（T1-T21 矩阵）
 mvn test          # 仅测试
 ```
 
@@ -42,8 +42,9 @@ mvn test          # 仅测试
 
 ## 实施中固化的设计决策（不要无意回退）
 
-- 条件方法签名是 `<C> eq(SFunction<C, ?> col, ...)` 泛型方法——
+- 条件入口签名是 `<C, V> col(SFunction<C, V> col)` 这类泛型方法——
   `SFunction<?, ?>` 通配目标会让方法引用编译失败（javac 实验已验证）。
+  分层入口（col/cmpCol/strCol/numCol）同样遵循此约束。
 - 标量子查询独立命名 `eqSubQuery/neSubQuery/...`——避免与
   `eq(col, null)→IS NULL` 的重载歧义。
 - `and/or(consumer)` 为 MyBatis-Plus 语义：控制分组的外连接符，

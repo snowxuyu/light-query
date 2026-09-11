@@ -94,26 +94,32 @@ public final class Where<T> {
 
     // ------------------------------------------------------------------ aggregate comparisons (HAVING)
 
+    /** HAVING: {@code aggregate = value}. */
     public Where<T> eq(Aggregate aggregate, Number value) {
         return addAggregate(aggregate, Operator.EQ, value);
     }
 
+    /** HAVING: {@code aggregate <> value}. */
     public Where<T> ne(Aggregate aggregate, Number value) {
         return addAggregate(aggregate, Operator.NE, value);
     }
 
+    /** HAVING: {@code aggregate > value}. */
     public Where<T> gt(Aggregate aggregate, Number value) {
         return addAggregate(aggregate, Operator.GT, value);
     }
 
+    /** HAVING: {@code aggregate >= value}. */
     public Where<T> ge(Aggregate aggregate, Number value) {
         return addAggregate(aggregate, Operator.GE, value);
     }
 
+    /** HAVING: {@code aggregate < value}. */
     public Where<T> lt(Aggregate aggregate, Number value) {
         return addAggregate(aggregate, Operator.LT, value);
     }
 
+    /** HAVING: {@code aggregate <= value}. */
     public Where<T> le(Aggregate aggregate, Number value) {
         return addAggregate(aggregate, Operator.LE, value);
     }

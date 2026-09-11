@@ -29,18 +29,22 @@ public class ComparableColumn<B, V extends Comparable<V>> extends TypedColumn<B,
         super(builder, group, ref, meta, resolver, onSubQuery);
     }
 
+    /** {@code col > value}. */
     public B gt(V value) {
         return add(Operator.GT, value);
     }
 
+    /** {@code col >= value}. */
     public B ge(V value) {
         return add(Operator.GE, value);
     }
 
+    /** {@code col < value}. */
     public B lt(V value) {
         return add(Operator.LT, value);
     }
 
+    /** {@code col <= value}. */
     public B le(V value) {
         return add(Operator.LE, value);
     }
@@ -52,6 +56,7 @@ public class ComparableColumn<B, V extends Comparable<V>> extends TypedColumn<B,
         return builder;
     }
 
+    /** Excludes the inclusive range. */
     public B notBetween(V lo, V hi) {
         group.add(Condition.of(ref, Operator.NOT_BETWEEN,
                 Arrays.asList(meta.toDbValue(lo), meta.toDbValue(hi))));
@@ -63,14 +68,17 @@ public class ComparableColumn<B, V extends Comparable<V>> extends TypedColumn<B,
         return compareColumn(other, Operator.GT);
     }
 
+    /** Column-to-column {@code >=} against another property of the same value type. */
     public <C> B geColumn(SFunction<C, V> other) {
         return compareColumn(other, Operator.GE);
     }
 
+    /** Column-to-column {@code <} against another property of the same value type. */
     public <C> B ltColumn(SFunction<C, V> other) {
         return compareColumn(other, Operator.LT);
     }
 
+    /** Column-to-column {@code <=} against another property of the same value type. */
     public <C> B leColumn(SFunction<C, V> other) {
         return compareColumn(other, Operator.LE);
     }

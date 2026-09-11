@@ -23,18 +23,22 @@ public class UpdatableComparableColumn<T, V extends Comparable<V>> extends Updat
         super(updatable, group, ref, meta, resolver, setTargetsRoot);
     }
 
+    /** {@code col > value}. */
     public Updatable<T> gt(V value) {
         return add(Operator.GT, value);
     }
 
+    /** {@code col >= value}. */
     public Updatable<T> ge(V value) {
         return add(Operator.GE, value);
     }
 
+    /** {@code col < value}. */
     public Updatable<T> lt(V value) {
         return add(Operator.LT, value);
     }
 
+    /** {@code col <= value}. */
     public Updatable<T> le(V value) {
         return add(Operator.LE, value);
     }
@@ -46,6 +50,7 @@ public class UpdatableComparableColumn<T, V extends Comparable<V>> extends Updat
         return updatable;
     }
 
+    /** Excludes the inclusive range. */
     public Updatable<T> notBetween(V lo, V hi) {
         group.add(Condition.of(ref, Operator.NOT_BETWEEN,
                 Arrays.asList(meta.toDbValue(lo), meta.toDbValue(hi))));
@@ -58,16 +63,19 @@ public class UpdatableComparableColumn<T, V extends Comparable<V>> extends Updat
         return updatable;
     }
 
+    /** Column-to-column {@code >=} against another property of the same value type. */
     public <C> Updatable<T> geColumn(SFunction<C, V> other) {
         group.add(Condition.ofColumns(ref, Operator.GE, resolver.resolve(other).ref()));
         return updatable;
     }
 
+    /** Column-to-column {@code <} against another property of the same value type. */
     public <C> Updatable<T> ltColumn(SFunction<C, V> other) {
         group.add(Condition.ofColumns(ref, Operator.LT, resolver.resolve(other).ref()));
         return updatable;
     }
 
+    /** Column-to-column {@code <=} against another property of the same value type. */
     public <C> Updatable<T> leColumn(SFunction<C, V> other) {
         group.add(Condition.ofColumns(ref, Operator.LE, resolver.resolve(other).ref()));
         return updatable;

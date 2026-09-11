@@ -73,7 +73,7 @@ class SpringStarterTest {
             // the session bean participates: register + query through the facade
             LightQuery.insert(new StarterUser("facade-user"));
             long count = LightQuery.queryable(StarterUser.class)
-                    .eq(StarterUser::getName, "facade-user").count();
+                    .col(StarterUser::getName).eq("facade-user").count();
             assertThat(count).isEqualTo(1);
         });
     }
@@ -114,11 +114,11 @@ class SpringStarterTest {
             session.insert(new StarterUser("tx-commit"));
             // the same bound connection sees its own uncommitted write
             assertThat(session.queryable(StarterUser.class)
-                    .eq(StarterUser::getName, "tx-commit").count()).isEqualTo(1);
+                    .col(StarterUser::getName).eq("tx-commit").count()).isEqualTo(1);
             return null;
         });
         assertThat(plainSession.queryable(StarterUser.class)
-                .eq(StarterUser::getName, "tx-commit").count()).isEqualTo(1);
+                .col(StarterUser::getName).eq("tx-commit").count()).isEqualTo(1);
 
         // rolled-back transaction: the row disappears without any light-query rollback
         template.execute(status -> {
@@ -127,7 +127,7 @@ class SpringStarterTest {
             return null;
         });
         assertThat(plainSession.queryable(StarterUser.class)
-                .eq(StarterUser::getName, "tx-rollback").count()).isEqualTo(0);
+                .col(StarterUser::getName).eq("tx-rollback").count()).isEqualTo(0);
     }
 
     @Test
@@ -138,6 +138,6 @@ class SpringStarterTest {
         org.junit.jupiter.api.Assertions.assertFalse(springProvider.inManagedTransaction());
         session.insert(new StarterUser("no-tx"));
         assertThat(plainSession.queryable(StarterUser.class)
-                .eq(StarterUser::getName, "no-tx").count()).isEqualTo(1);
+                .col(StarterUser::getName).eq("no-tx").count()).isEqualTo(1);
     }
 }

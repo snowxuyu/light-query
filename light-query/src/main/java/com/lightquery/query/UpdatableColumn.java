@@ -1,6 +1,7 @@
 package com.lightquery.query;
 
 import com.lightquery.lambda.SFunction;
+import com.lightquery.exception.SqlBuildException;
 import com.lightquery.meta.ColumnMeta;
 import com.lightquery.query.model.ColumnRef;
 import com.lightquery.query.model.Condition;
@@ -104,11 +105,13 @@ public class UpdatableColumn<T, V> {
         return notIn(java.util.Arrays.asList(values));
     }
 
+    /** {@code col IS NULL}. */
     public Updatable<T> isNull() {
         group.add(Condition.of(ref, Operator.IS_NULL, null));
         return updatable;
     }
 
+    /** {@code col IS NOT NULL}. */
     public Updatable<T> isNotNull() {
         group.add(Condition.of(ref, Operator.IS_NOT_NULL, null));
         return updatable;
@@ -127,7 +130,7 @@ public class UpdatableColumn<T, V> {
 
     protected void requireSetAllowed() {
         if (!setTargetsRoot) {
-            throw new com.lightquery.exception.SqlBuildException(
+            throw new SqlBuildException(
                     "set(...) modifies the updated entity only — joined table columns "
                             + "are read-only here. Reference joined tables in conditions instead.");
         }
@@ -135,7 +138,7 @@ public class UpdatableColumn<T, V> {
 
     protected void requireNotPrimaryKey() {
         if (meta.isPrimaryKey()) {
-            throw new com.lightquery.exception.SqlBuildException(
+            throw new SqlBuildException(
                     "set(...) cannot modify primary key column '" + meta.getColumnName() + "'");
         }
     }
