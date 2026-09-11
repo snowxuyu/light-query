@@ -277,24 +277,18 @@ public final class LightQuerySession implements QueryExecutor {     // 绑定一
 
 ```java
 public final class Queryable<T> {
-    // ── 条件（平铺恒为 AND；SFunction 一律 SFunction<?,?>，值不做静态类型检查——无 APT 的显式权衡）
-    Queryable<T> eq(SFunction<?, ?> col, Object value);   // value=null → IS NULL
-    Queryable<T> ne(SFunction<?, ?> col, Object value);   // value=null → IS NOT NULL
-    Queryable<T> gt/ge/lt/le(SFunction<?, ?> col, Object value);
-    Queryable<T> like(SFunction<?, ?> col, String contains);      // 两侧加 %；%_\ 自带转义
-    Queryable<T> notLike(SFunction<?, ?> col, String contains);
-    Queryable<T> startsWith(SFunction<?, ?> col, String prefix);  // 右侧 %
-    Queryable<T> endsWith(SFunction<?, ?> col, String suffix);    // 左侧 %
-    Queryable<T> in(SFunction<?, ?> col, Collection<?> values);   // 空集合 → 1=0
-    Queryable<T> in(SFunction<?, ?> col, Object... values);
-    Queryable<T> notIn(SFunction<?, ?> col, Collection<?> values);// 空集合 → 1=1
-    Queryable<T> notIn(SFunction<?, ?> col, Object... values);
-    Queryable<T> isNull(SFunction<?, ?> col); isNotNull(SFunction<?, ?> col);
-    Queryable<T> between(SFunction<?, ?> col, Object lo, Object hi);   // 双闭区间
-    Queryable<T> notBetween(SFunction<?, ?> col, Object lo, Object hi);
-    // 列对列比较（join ON / 相关子查询用）
-    Queryable<T> eqColumn(SFunction<?, ?> a, SFunction<?, ?> b);
-    Queryable<T> neColumn/gtColumn/geColumn/ltColumn/leColumn(...);
+    // ── 条件：先选分层入口（值类型由属性 lambda 在编译期锁定），再在返回的列柄上写条件；
+    // 每层方法都返回 builder，链式继续。旧的裸 .eq(col, value) 双参直调已移除，见强类型迁移表（README“条件”）。
+    <C, V> TypedColumn<Queryable<T>, V> col(SFunction<C, V> col);
+        // 相等族：eq/ne（null → IS NULL / IS NOT NULL）、in/notIn（空集合 → 1=0 / 1=1）、
+        // isNull/isNotNull、eqColumn/neColumn（同值类型列对列）、in/notIn/比较子查询
+    <C, V extends Comparable<V>> ComparableColumn<Queryable<T>, V> cmpCol(SFunction<C, V> col);
+        // 相等族 + gt/ge/lt/le/between/notBetween
+    <C> StringColumn<Queryable<T>> strCol(SFunction<C, String> col);
+        // 相等族 + like/notLike（两侧加 %，%_\ 自动转义）/startsWith/endsWith
+    <C, V extends Number & Comparable<V>> NumberColumn<Queryable<T>, V> numCol(SFunction<C, V> col);
+        // 比较族（数值列）；聚合终端 sum/avg/max/min 要求 Number 属性
+    // TableColumn（自连接 occurrence）同理：col/cmpCol/strCol/numCol(TableColumn<?, V>)
 
     // ── 逻辑分组（嵌套 Where 的连接词默认 AND，组内 .or() 改变相邻连接）
     Queryable<T> and(Consumer<Where<T>> group);   // → AND ( … )
@@ -352,9 +346,10 @@ public final class Queryable<T> {
 
 ```java
 public final class JoinOn<A, B> {
-    JoinOn<A, B> eq(SFunction<?, ?> colA, SFunction<?, ?> colB);   // 主用法：a.id = b.userId
-    JoinOn<A, B> ne/gt/ge/lt/le(colA, colB);
-    JoinOn<A, B> eq(SFunction<?, ?> col, Object value);            // 常量条件
+    // 列对列（主用法）：先 col/cmpCol/strCol/numCol 选一侧，再 .eqColumn/neColumn/...(另一侧)——
+    // 两侧值类型一致才编译通过；旧的裸 eq(colA, colB) 通配符重载已移除（曾允许跨类型比较）。
+    // 自连接 occurrence 用 TableColumn 重载：eqColumn/neColumn/gtColumn/geColumn/ltColumn/leColumn(colA, colB)。
+    JoinOn<A, B> eq/ne/gt/ge/lt/le(SFunction<C, V> col, V value);  // 常量条件（值类型锁定）
     JoinOn<A, B> or();                                             // 改变下一个条件的连接符
 }
 ```
@@ -548,17 +543,17 @@ List<User> page2 = db.queryable(User.class).orderByAsc(User::getId).seekAfter(la
 ### 5.14 update join / delete join（v0.3）
 
 ```java
-// MySQL：UPDATE a JOIN b ON .. SET a.x = ?
+// MySQL：UPDATE a, b SET .. WHERE ..（ON 并入 WHERE）
 int rows = db.updatable(User.class)
-    .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-    .set(User::getStatus, Status.FROZEN)
-    .gt(Order::getAmount, new BigDecimal("100"))
+    .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+    .col(User::getStatus).set(Status.FROZEN)
+    .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
     .execute();
 
 // delete join（@LogicDelete 实体自动转 UPDATE join；physical() 强转物理 DELETE）
 db.deletable(User.class)
-  .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-  .gt(Order::getAmount, new BigDecimal("100"))
+  .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+  .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
   .execute();
 ```
 
@@ -567,10 +562,11 @@ db.deletable(User.class)
 - `Updatable.join(Class, Consumer<JoinOn>)` / `Deletable.join(...)`：INNER join（v0.3 不支持
   LEFT/RIGHT join 写法），表不可重复 join；join 后条件可引用双方实体，`set(...)` 仍仅限目标实体
   （否则 SqlBuildException）。未 join 实体的条件同样报错并提示。
-- 方言决定语句形态（`Dialect.updateJoinSql / deleteJoinSql` 接收预渲染片段自行拼装）：
-  - MySQL / MariaDB：`UPDATE a t0 JOIN b t1 ON .. SET t0.x = ?`；`DELETE t0 FROM a t0 JOIN b t1 ON ..`
-  - SQL Server：`UPDATE t0 SET .. FROM a t0 JOIN b t1 ON ..`；`DELETE t0 FROM a t0 JOIN b t1 ON ..`
-  - PostgreSQL：`UPDATE a t0 SET .. FROM b t1 WHERE ..`（ON 并入 WHERE）；`DELETE FROM a t0 USING b t1 WHERE ..`
+- 方言决定语句形态（ON 条件一律预并入 WHERE；`Dialect` 按 6 字段 JoinPieces 自行拼装）：
+  - MySQL / MariaDB：`UPDATE a t0, b t1 SET t0.x = ? WHERE ..`；`DELETE t0 FROM a t0, b t1 WHERE ..`
+  - SQL Server：`UPDATE t0 SET .. FROM a t0, b t1 WHERE ..`；`DELETE t0 FROM a t0, b t1 WHERE ..`（测试显示
+    当前实现为逗号风格 FROM 列表；若未来切回 ANSI JOIN 形态，需同步 T20 快照）
+  - PostgreSQL：`UPDATE a t0 SET .. FROM b t1 WHERE ..`；`DELETE FROM a t0 USING b t1 WHERE ..`
   - **Oracle / H2 不支持**：执行或 `toSql()` 时抛 `SqlBuildException` 并提示改用 IN 子查询
 - SET 子句中数值自增同样按方言限定列（MySQL/SQLServer `t0.x = t0.x + ?`，PG `x = x + ?`）。
 - 逻辑删除实体的 delete join 走 UPDATE join（置 deleted 标记）；`physical()` 强制物理 DELETE join。

@@ -44,7 +44,7 @@ class SelfJoinH2Test {
         List<Tuple> rows = db.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-                .eq(manager.col(Employee::getName), "Alice")
+                .col(manager.col(Employee::getName)).eq("Alice")
                 .select(staff.col(Employee::getName), manager.col(Employee::getName).as("manager_name"))
                 .orderByAsc(staff.col(Employee::getName))
                 .toTupleList();
@@ -60,7 +60,7 @@ class SelfJoinH2Test {
         List<Tuple> rows = db.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-                .eq(staff.col(Employee::getName), "Erin")
+                .col(staff.col(Employee::getName)).eq("Erin")
                 .select(manager.col(Employee::getName).as("manager_name"))
                 .toTupleList();
         assertEquals(1, rows.size());
@@ -73,7 +73,7 @@ class SelfJoinH2Test {
         long count = db.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-                .eq(staff.col(Employee::getName), "Dave")
+                .col(staff.col(Employee::getName)).eq("Dave")
                 .count();
         assertEquals(0, count);
     }
@@ -84,7 +84,7 @@ class SelfJoinH2Test {
                 db.queryable(staff)
                         .leftJoin(manager, on -> on.eqColumn(
                                 staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-                        .eq(Employee::getName, "Bob"));
+                        .col(Employee::getName).eq("Bob"));
         assertTrue(e.getMessage().contains("more than once"), e.getMessage());
         assertTrue(e.getMessage().contains("QueryTable"), e.getMessage());
     }
@@ -93,8 +93,7 @@ class SelfJoinH2Test {
     void plainClassSelfJoinIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class, () ->
                 db.queryable(Employee.class)
-                        .leftJoin(Employee.class, on -> on.eq(
-                                Employee::getManagerId, Employee::getId)));
+                        .leftJoin(Employee.class, on -> on.col(Employee::getManagerId).eqColumn(Employee::getId)));
         assertTrue(e.getMessage().contains("QueryTable.of"), e.getMessage());
     }
 
@@ -102,7 +101,7 @@ class SelfJoinH2Test {
     void unregisteredOccurrenceIsRejected() {
         QueryTable<Employee> unknown = QueryTable.of(Employee.class, "ghost");
         SqlBuildException e = assertThrows(SqlBuildException.class, () ->
-                db.queryable(staff).eq(unknown.col(Employee::getName), "x"));
+                db.queryable(staff).col(unknown.col(Employee::getName)).eq("x"));
         assertTrue(e.getMessage().contains("ghost"), e.getMessage());
     }
 
@@ -130,7 +129,7 @@ class SelfJoinH2Test {
         List<Tuple> rows = db.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-                .isNull(manager.col(Employee::getId))
+                .col(manager.col(Employee::getId)).isNull()
                 .select(staff.col(Employee::getName))
                 .toTupleList();
         assertEquals(1, rows.size());
@@ -143,8 +142,8 @@ class SelfJoinH2Test {
         List<Tuple> rows = db.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-                .gt(staff.col(Employee::getSalary), new java.math.BigDecimal("11000"))
-                .gt(manager.col(Employee::getSalary), new java.math.BigDecimal("15000"))
+                .cmpCol(staff.col(Employee::getSalary)).gt(new java.math.BigDecimal("11000"))
+                .cmpCol(manager.col(Employee::getSalary)).gt(new java.math.BigDecimal("15000"))
                 .select(staff.col(Employee::getName))
                 .toTupleList();
         assertEquals(1, rows.size());

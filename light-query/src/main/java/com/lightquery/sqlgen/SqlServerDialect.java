@@ -43,12 +43,12 @@ public class SqlServerDialect implements Dialect {
     @Override
     public String updateJoinSql(JoinPieces p) {
         return "UPDATE " + p.alias() + " SET " + p.setClauseQualified() + " FROM "
-                + p.rootDefinition() + " " + p.joinedTables() + p.whereClause();
+                + p.rootDefinition() + ", " + p.joinTableList() + p.whereClause();
     }
 
     @Override
     public String deleteJoinSql(JoinPieces p) {
-        return "DELETE " + p.alias() + " FROM " + p.rootDefinition() + " " + p.joinedTables()
+        return "DELETE " + p.alias() + " FROM " + p.rootDefinition() + ", " + p.joinTableList()
                 + p.whereClause();
     }
 }

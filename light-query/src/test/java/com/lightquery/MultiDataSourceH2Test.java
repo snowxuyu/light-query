@@ -55,15 +55,15 @@ class MultiDataSourceH2Test {
     @Test
     void defaultOperationsTargetPrimary() {
         LightQuery.insert(primary.user("mdsDefault", User.Status.ACTIVE, 1, null, null, 0));
-        assertEquals(1, primary.db.queryable(User.class).eq(User::getName, "mdsDefault").count());
-        assertEquals(0, report.db.queryable(User.class).eq(User::getName, "mdsDefault").count());
+        assertEquals(1, primary.db.queryable(User.class).col(User::getName).eq("mdsDefault").count());
+        assertEquals(0, report.db.queryable(User.class).col(User::getName).eq("mdsDefault").count());
     }
 
     @Test
     void datasourceSwitchesToNamedDatasource() {
         LightQuery.datasource("report").insert(report.user("mdsSwitched", User.Status.ACTIVE, 1, null, null, 0));
-        assertEquals(1, report.db.queryable(User.class).eq(User::getName, "mdsSwitched").count());
-        assertEquals(0, primary.db.queryable(User.class).eq(User::getName, "mdsSwitched").count());
+        assertEquals(1, report.db.queryable(User.class).col(User::getName).eq("mdsSwitched").count());
+        assertEquals(0, primary.db.queryable(User.class).col(User::getName).eq("mdsSwitched").count());
     }
 
     @Test
@@ -74,8 +74,8 @@ class MultiDataSourceH2Test {
         // same name + same DataSource resolves to the same cached session
         assertSame(LightQuery.datasource("inline"), LightQuery.datasource("inline", report.dataSource));
         assertEquals(1, LightQuery.datasource("inline").queryable(User.class)
-                .eq(User::getName, "mdsInline").count());
-        assertEquals(0, primary.db.queryable(User.class).eq(User::getName, "mdsInline").count());
+                .col(User::getName).eq("mdsInline").count());
+        assertEquals(0, primary.db.queryable(User.class).col(User::getName).eq("mdsInline").count());
     }
 
     @Test
@@ -139,13 +139,13 @@ class MultiDataSourceH2Test {
             tx.insert(report.user("mdsTxRollback", User.Status.ACTIVE, 1, null, null, 0));
             throw new IllegalStateException("boom");
         }));
-        assertEquals(0, report.db.queryable(User.class).eq(User::getName, "mdsTxRollback").count());
+        assertEquals(0, report.db.queryable(User.class).col(User::getName).eq("mdsTxRollback").count());
 
         LightQuery.datasource("report").inTransaction(tx -> {
             tx.insert(report.user("mdsTxCommit", User.Status.ACTIVE, 1, null, null, 0));
             return null;
         });
-        assertEquals(1, report.db.queryable(User.class).eq(User::getName, "mdsTxCommit").count());
+        assertEquals(1, report.db.queryable(User.class).col(User::getName).eq("mdsTxCommit").count());
     }
 
     @Test
@@ -157,15 +157,15 @@ class MultiDataSourceH2Test {
                     .insert(report.user("mdsCrossDs", User.Status.ACTIVE, 1, null, null, 0));
             throw new IllegalStateException("boom");
         }));
-        assertEquals(0, primary.db.queryable(User.class).eq(User::getName, "mdsInTx").count());
-        assertEquals(1, report.db.queryable(User.class).eq(User::getName, "mdsCrossDs").count());
+        assertEquals(0, primary.db.queryable(User.class).col(User::getName).eq("mdsInTx").count());
+        assertEquals(1, report.db.queryable(User.class).col(User::getName).eq("mdsCrossDs").count());
     }
 
     @Test
     void ofCreatesStandaloneSessionWithoutRegistering() {
         LightQuerySession session = LightQuery.of(report.dataSource);
         session.insert(report.user("mdsStandalone", User.Status.ACTIVE, 1, null, null, 0));
-        assertEquals(1, report.db.queryable(User.class).eq(User::getName, "mdsStandalone").count());
-        assertEquals(0, primary.db.queryable(User.class).eq(User::getName, "mdsStandalone").count());
+        assertEquals(1, report.db.queryable(User.class).col(User::getName).eq("mdsStandalone").count());
+        assertEquals(0, primary.db.queryable(User.class).col(User::getName).eq("mdsStandalone").count());
     }
 }

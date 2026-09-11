@@ -70,7 +70,7 @@ class ProjectionH2Test {
     @Test
     void recordComponentsCoerceEnumsAndNumbers() {
         List<FullUserRow> rows = h2.db.queryable(User.class)
-                .eq(User::getName, "alice")
+                .col(User::getName).eq("alice")
                 .toList(FullUserRow.class);
         assertEquals(1, rows.size());
         assertEquals(User.Status.ACTIVE, rows.get(0).status());

@@ -19,7 +19,7 @@ interface ColumnResolver {
     Resolved resolve(SFunction<?, ?> lambda);
 
     /** Resolves a self-join column to its column reference and column metadata. */
-    Resolved resolve(TableColumn<?> column);
+    Resolved resolve(TableColumn<?, ? > column);
 
     /** Resolves an aggregate handle ({@link com.lightquery.Aggregations}) to an expression. */
     Expr resolveAggregate(Aggregate aggregate);

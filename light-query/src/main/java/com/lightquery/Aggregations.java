@@ -36,22 +36,22 @@ public final class Aggregations {
     }
 
     /** {@code sum(col)} */
-    public static <C> Aggregate sum(SFunction<C, ?> col) {
+    public static <C, V extends Number> Aggregate sum(SFunction<C, V> col) {
         return new Aggregate("sum", col, false, null);
     }
 
     /** {@code avg(col)} */
-    public static <C> Aggregate avg(SFunction<C, ?> col) {
+    public static <C, V extends Number> Aggregate avg(SFunction<C, V> col) {
         return new Aggregate("avg", col, false, null);
     }
 
     /** {@code max(col)} */
-    public static <C> Aggregate max(SFunction<C, ?> col) {
+    public static <C, V extends Number> Aggregate max(SFunction<C, V> col) {
         return new Aggregate("max", col, false, null);
     }
 
     /** {@code min(col)} */
-    public static <C> Aggregate min(SFunction<C, ?> col) {
+    public static <C, V extends Number> Aggregate min(SFunction<C, V> col) {
         return new Aggregate("min", col, false, null);
     }
 }

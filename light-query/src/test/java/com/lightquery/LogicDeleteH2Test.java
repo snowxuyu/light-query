@@ -30,14 +30,14 @@ class LogicDeleteH2Test {
     @Test
     void queriesExcludeDeletedByDefault() {
         assertEquals(1, h2.db.queryable(User.class)
-                .in(User::getName, List.of("alive", "dead")).count());
-        assertNull(h2.db.queryable(User.class).eq(User::getName, "dead").firstOrNull());
+                .col(User::getName).in(List.of("alive", "dead")).count());
+        assertNull(h2.db.queryable(User.class).col(User::getName).eq("dead").firstOrNull());
     }
 
     @Test
     void includeDeletedShowsEverything() {
         assertEquals(2, h2.db.queryable(User.class).includeDeleted()
-                .in(User::getName, List.of("alive", "dead")).count());
+                .col(User::getName).in(List.of("alive", "dead")).count());
     }
 
     @Test
@@ -46,7 +46,7 @@ class LogicDeleteH2Test {
         h2.db.delete(user);
         // the row is still there, flagged
         User raw = h2.db.queryable(User.class).includeDeleted()
-                .eq(User::getId, user.getId()).firstOrNull();
+                .col(User::getId).eq(user.getId()).firstOrNull();
         assertEquals(1, raw.getDeleted());
         // and invisible through normal queries
         assertNull(h2.db.queryById(User.class, user.getId()));
@@ -55,25 +55,25 @@ class LogicDeleteH2Test {
     @Test
     void physicalDeleteRemovesRow() {
         User user = h2.db.insert(h2.user("hard", User.Status.ACTIVE, 4, null, null, 0));
-        h2.db.deletable(User.class).physical().eq(User::getId, user.getId()).execute();
+        h2.db.deletable(User.class).physical().col(User::getId).eq(user.getId()).execute();
         assertEquals(null, h2.db.queryable(User.class).includeDeleted()
-                .eq(User::getId, user.getId()).firstOrNull());
+                .col(User::getId).eq(user.getId()).firstOrNull());
     }
 
     @Test
     void deletableBecomesUpdateByDefault() {
         h2.db.insert(h2.user("bulk1", User.Status.FROZEN, 5, null, null, 0));
         h2.db.insert(h2.user("bulk2", User.Status.FROZEN, 6, null, null, 0));
-        int rows = h2.db.deletable(User.class).startsWith(User::getName, "bulk").execute();
+        int rows = h2.db.deletable(User.class).strCol(User::getName).startsWith("bulk").execute();
         assertEquals(2, rows);
-        assertEquals(0, h2.db.queryable(User.class).startsWith(User::getName, "bulk").count());
+        assertEquals(0, h2.db.queryable(User.class).strCol(User::getName).startsWith("bulk").count());
     }
 
     @Test
     void updatableSkipsDeletedRows() {
         int rows = h2.db.updatable(User.class)
-                .set(User::getAge, 99)
-                .eq(User::getName, "dead")
+                .col(User::getAge).set(99)
+                .col(User::getName).eq("dead")
                 .execute();
         assertEquals(0, rows); // filtered out by the logic-delete condition
     }
@@ -81,9 +81,9 @@ class LogicDeleteH2Test {
     @Test
     void updatableIncludeDeletedOverrides() {
         int rows = h2.db.updatable(User.class)
-                .set(User::getAge, 99)
+                .col(User::getAge).set(99)
                 .includeDeleted()
-                .eq(User::getName, "dead")
+                .col(User::getName).eq("dead")
                 .execute();
         assertEquals(1, rows);
     }
@@ -102,7 +102,7 @@ class LogicDeleteH2Test {
     void deletingAlreadyDeletedRowStillReportsOneRow() {
         // idempotent delete: UPDATE ... WHERE pk (no logic filter) always hits the row
         User dead = h2.db.queryable(User.class).includeDeleted()
-                .eq(User::getName, "dead").firstOrNull();
+                .col(User::getName).eq("dead").firstOrNull();
         h2.db.delete(dead); // must not throw UnexpectedRowsException
     }
 }

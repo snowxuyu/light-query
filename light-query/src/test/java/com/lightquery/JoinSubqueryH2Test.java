@@ -35,7 +35,7 @@ class JoinSubqueryH2Test {
     void innerJoinDropsRowsWithoutMatch() {
         // SQL semantics: one row per matching order (the user has two orders)
         List<User> rows = h2.db.queryable(User.class)
-                .innerJoin(Order.class, on -> on.eq(User::getId, Order::getUserId))
+                .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .toList();
         assertEquals(2, rows.size());
         assertTrue(rows.stream().allMatch(u -> u.getName().equals("withOrders")));
@@ -44,7 +44,7 @@ class JoinSubqueryH2Test {
     @Test
     void leftJoinKeepsUnmatchedRows() {
         List<User> rows = h2.db.queryable(User.class)
-                .leftJoin(Order.class, on -> on.eq(User::getId, Order::getUserId))
+                .leftJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .toList();
         // 2 matching order rows + 1 unmatched user row
         assertEquals(3, rows.size());
@@ -53,8 +53,8 @@ class JoinSubqueryH2Test {
     @Test
     void conditionsCanReferenceJoinedEntities() {
         List<User> rows = h2.db.queryable(User.class)
-                .innerJoin(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .ge(Order::getAmount, new BigDecimal("100"))
+                .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .cmpCol(Order::getAmount).ge(new BigDecimal("100"))
                 .toList();
         assertEquals(1, rows.size());
         assertEquals("withOrders", rows.get(0).getName());
@@ -63,9 +63,9 @@ class JoinSubqueryH2Test {
     @Test
     void multipleConditionsJoinEveryTable() {
         List<User> rows = h2.db.queryable(User.class)
-                .innerJoin(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .gt(Order::getAmount, new BigDecimal("100"))
-                .ge(Order::getAmount, new BigDecimal("100"))
+                .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
+                .cmpCol(Order::getAmount).ge(new BigDecimal("100"))
                 .toList();
         assertEquals(1, rows.size());
     }
@@ -73,8 +73,8 @@ class JoinSubqueryH2Test {
     @Test
     void joinOnSupportsConstantConditions() {
         List<User> rows = h2.db.queryable(User.class)
-                .innerJoin(Order.class, on -> on.eq(User::getId, Order::getUserId)
-                        .eq(Order::getStatus, 1))
+                .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId)
+                        .col(Order::getStatus).eq(1))
                 .toList();
         assertEquals(1, rows.size());
     }
@@ -82,9 +82,9 @@ class JoinSubqueryH2Test {
     @Test
     void tupleProjectionAcrossTables() {
         List<Tuple> rows = h2.db.queryable(User.class)
-                .innerJoin(Order.class, on -> on.eq(User::getId, Order::getUserId))
+                .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .select(User::getName).select(Order::getAmount)
-                .ge(Order::getAmount, new BigDecimal("100"))
+                .cmpCol(Order::getAmount).ge(new BigDecimal("100"))
                 .toTupleList();
         assertEquals(1, rows.size());
         assertEquals("withOrders", rows.get(0).get("user_name"));
@@ -94,7 +94,7 @@ class JoinSubqueryH2Test {
     @Test
     void inSubQuery() {
         List<User> rows = h2.db.queryable(User.class)
-                .in(User::getId, h2.db.queryable(Order.class).select(Order::getUserId))
+                .col(User::getId).in(h2.db.queryable(Order.class).select(Order::getUserId))
                 .toList();
         assertEquals(1, rows.size());
         assertEquals("withOrders", rows.get(0).getName());
@@ -103,7 +103,7 @@ class JoinSubqueryH2Test {
     @Test
     void notInSubQuery() {
         List<User> rows = h2.db.queryable(User.class)
-                .notIn(User::getId, h2.db.queryable(Order.class).select(Order::getUserId))
+                .col(User::getId).notIn(h2.db.queryable(Order.class).select(Order::getUserId))
                 .toList();
         assertEquals(1, rows.size());
         assertEquals("withoutOrders", rows.get(0).getName());
@@ -113,8 +113,8 @@ class JoinSubqueryH2Test {
     void correlatedExists() {
         List<User> rows = h2.db.queryable(User.class)
                 .whereExists(h2.db.queryable(Order.class)
-                        .eqColumn(Order::getUserId, User::getId)
-                        .ge(Order::getAmount, new BigDecimal("100")))
+                        .col(Order::getUserId).eqColumn(User::getId)
+                        .cmpCol(Order::getAmount).ge(new BigDecimal("100")))
                 .toList();
         assertEquals(1, rows.size());
         assertTrue(rows.get(0).getName().equals("withOrders"));
@@ -124,7 +124,7 @@ class JoinSubqueryH2Test {
     void correlatedNotExists() {
         List<User> rows = h2.db.queryable(User.class)
                 .whereNotExists(h2.db.queryable(Order.class)
-                        .eqColumn(Order::getUserId, User::getId))
+                        .col(Order::getUserId).eqColumn(User::getId))
                 .toList();
         assertEquals(1, rows.size());
         assertEquals("withoutOrders", rows.get(0).getName());
@@ -144,7 +144,7 @@ class JoinSubqueryH2Test {
     void referencingUnknownEntityFailsWithHelpfulMessage() {
         // Order is not joined — the error must say so and list the scope
         try {
-            h2.db.queryable(User.class).eq(Order::getAmount, 1).toSql();
+            h2.db.queryable(User.class).col(Order::getAmount).eq(TestDb.decimal("1")).toSql();
             org.junit.jupiter.api.Assertions.fail("expected SqlBuildException");
         } catch (com.lightquery.exception.SqlBuildException e) {
             assertTrue(e.getMessage().contains("Order"), () -> e.getMessage());

@@ -91,7 +91,7 @@ class SeekPaginationH2Test {
         Integer lastAge = null;
         while (true) {
             var query = h2.db.queryable(User.class)
-                    .eq(User::getStatus, User.Status.ACTIVE)
+                    .col(User::getStatus).eq(User.Status.ACTIVE)
                     .orderByAsc(User::getAge)
                     .limit(2);
             if (lastAge != null) {
@@ -128,7 +128,7 @@ class SeekPaginationH2Test {
     void seekNullValueIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db.queryable(User.class)
                 .orderByAsc(User::getId)
-                .seekAfter((Object) null));
+                .seekAfter((Comparable<?>) null));
         assertTrue(e.getMessage().contains("must not be null"), e.getMessage());
     }
 }

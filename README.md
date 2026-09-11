@@ -101,19 +101,38 @@ LightQuery.datasource("order", dsOrder).queryable(Order.class)  // 内联注册 
 
 ### 条件
 
-条件平铺为 AND，`and()/or()` 分组，组内 `.or()` 切换连接符：
+先选分层入口（值类型由属性 lambda 在编译期锁定，写错直接编不过），再在返回的列柄上写条件：
 
 ```java
 LightQuery.queryable(User.class)
-    .eq(User::getStatus, Status.ACTIVE)          // null → IS NULL；ne → IS NOT NULL
-    .in(User::getName, List.of("a", "b"))        // 空集合 → 1 = 0（防全表事故）
-    .notIn(User::getName, List.of())             // 空 NOT IN → 1 = 1
-    .between(User::getAge, 18, 60)
-    .like(User::getName, "frank")                // \ % _ 自动转义，两侧加 %
-    .isNull(User::getRemark)
-    .and(w -> w.ge(User::getAge, 18).or().lt(User::getAge, 12))
+    .col(User::getStatus).eq(Status.ACTIVE)       // null → IS NULL；ne → IS NOT NULL
+    .col(User::getName).in(List.of("a", "b"))     // 空集合 → 1 = 0（防全表事故）
+    .col(User::getName).notIn(List.of())          // 空 NOT IN → 1 = 1
+    .cmpCol(User::getAge).between(18, 60)         // 比较族：gt/ge/lt/le/between/notBetween
+    .strCol(User::getName).like("frank")          // \ % _ 自动转义，两侧加 %
+    .col(User::getRemark).isNull()
+    .and(w -> w.cmpCol(User::getAge).ge(18).or().cmpCol(User::getAge).lt(12))
     .toList();
 ```
+
+| 入口 | 适用属性 | 条件族 |
+|---|---|---|
+| `col(...)` | 任意 | `eq/ne/in/notIn/isNull/isNotNull/eqColumn/neColumn` + 子查询 |
+| `cmpCol(...)` | `Comparable` | 相等族 + `gt/ge/lt/le/between/notBetween` |
+| `strCol(...)` | `String` | 相等族 + `like/notLike/startsWith/endsWith` |
+| `numCol(...)` | `Number` | 比较族（`sum/avg/max/min` 聚合终端同样要求 `Number` 属性） |
+
+旧写法对照（`Queryable/Updatable/Deletable/JoinOn` 上的裸双参条件已移除）：
+
+| 旧写法 | 新写法 |
+|---|---|
+| `.eq(User::getStatus, s)` | `.col(User::getStatus).eq(s)` |
+| `.gt(User::getAge, 18)` | `.cmpCol(User::getAge).gt(18)` |
+| `.like(User::getName, "f")` | `.strCol(User::getName).like("f")` |
+| `.in(User::getName, list)` | `.col(User::getName).in(list)` |
+| `on.eq(User::getId, Order::getUserId)` | `on.col(User::getId).eqColumn(Order::getUserId)` |
+| `.set(User::getStatus, s)` | `.col(User::getStatus).set(s)` |
+| `.setIncrement(User::getAge, 1)` | `.numCol(User::getAge).setIncrement(1)` |
 
 ### 投影
 
@@ -142,7 +161,7 @@ Number total = LightQuery.queryable(Order.class).sum(Order::getAmount);
 ```java
 List<Tuple> rows = LightQuery.queryable(Order.class)
     .select(Order::getStatus, Aggregations.sum(Order::getAmount).as("total"))
-    .gt(Order::getAmount, new BigDecimal("100"))
+    .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
     .groupBy(Order::getStatus)
     .having(w -> w.gt(Aggregations.count(), 2))
     .orderByDesc("total")
@@ -154,8 +173,8 @@ List<Tuple> rows = LightQuery.queryable(Order.class)
 ```java
 // join：lambda 的声明类自动解析表别名（t0/t1），引用未 join 的实体会直接报错并提示
 List<Tuple> rows = LightQuery.queryable(User.class)
-    .leftJoin(Order.class, on -> on.eq(User::getId, Order::getUserId))
-    .gt(Order::getAmount, new BigDecimal("100"))
+    .leftJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+    .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
     .select(User::getName)
     .toTupleList();
 
@@ -165,7 +184,7 @@ QueryTable<Employee> manager = QueryTable.of(Employee.class, "mgr");
 List<Tuple> pairs = LightQuery.queryable(staff)
     .leftJoin(manager, on -> on.eqColumn(
         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-    .eq(manager.col(Employee::getName), "Alice")
+    .col(manager.col(Employee::getName)).eq("Alice")
     .select(staff.col(Employee::getName), manager.col(Employee::getName).as("manager_name"))
     .toTupleList();
 
@@ -202,9 +221,9 @@ LightQuery.delete(user);              // 有 @LogicDelete → UPDATE deleted=1
 LightQuery.deleteById(User.class, 1L);// 幂等：0 行返回 0 不抛异常
 
 int rows = LightQuery.updatable(User.class)
-    .set(User::getStatus, Status.FROZEN)
-    .setIncrement(User::getAge, 1)
-    .eq(User::getId, 5)
+    .col(User::getStatus).set(Status.FROZEN)
+    .numCol(User::getAge).setIncrement(1)
+    .col(User::getId).eq(5)
     .execute();                       // 无条件执行需要显式 allowFullTable()
 ```
 
@@ -255,7 +274,7 @@ LightQuery.setFillListener(new FillListener() {
 
 | 场景 | 行为 |
 |---|---|
-| `eq(col, null)` | 渲染为 `col IS NULL`；`ne` → `IS NOT NULL` |
+| `.col(..).eq(null)` | 渲染为 `col IS NULL`；`ne` → `IS NOT NULL` |
 | 空 `IN` / 空 `NOT IN` | `1 = 0` / `1 = 1`（防全表事故） |
 | `like` | 值自动转义 `\ % _` 后两侧加 `%`；PG/H2/Oracle/SQLServer 输出 `ESCAPE '\'` |
 | 逻辑删除 | 查询/更新自动追加过滤；`includeDeleted()` / `physical()` 逃生门 |

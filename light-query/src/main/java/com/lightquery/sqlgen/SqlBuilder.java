@@ -117,25 +117,13 @@ public final class SqlBuilder {
         String alias = dialect.quote(scope.aliasOf(model.getRoot()));
         String rootDefinition = dialect.quote(model.getRoot().getTableName()) + " " + alias;
 
-        StringBuilder joinedTables = new StringBuilder();
         StringBuilder joinTableList = new StringBuilder();
-        StringBuilder onConditions = new StringBuilder();
         for (JoinSpec join : model.getJoins()) {
             String joinAlias = dialect.quote(scope.aliasOf(join.table()));
-            if (joinedTables.length() > 0) {
-                joinedTables.append(' ');
-            }
-            joinedTables.append(join.type().text()).append(' ')
-                    .append(dialect.quote(join.table().getTableName())).append(' ').append(joinAlias)
-                    .append(" ON ").append(renderGroup(join.on(), scope, ctx, 0));
             if (joinTableList.length() > 0) {
                 joinTableList.append(", ");
             }
             joinTableList.append(dialect.quote(join.table().getTableName())).append(' ').append(joinAlias);
-            if (onConditions.length() > 0) {
-                onConditions.append(" AND ");
-            }
-            onConditions.append(renderGroup(join.on(), scope, ctx, 0));
         }
 
         StringBuilder qualifiedSets = new StringBuilder();
@@ -158,9 +146,22 @@ public final class SqlBuilder {
             ctx.params().add(set.value());
         }
 
+        StringBuilder onConditions = new StringBuilder();
+        for (JoinSpec join : model.getJoins()) {
+            if (onConditions.length() > 0) {
+                onConditions.append(" AND ");
+            }
+            onConditions.append(renderGroup(join.on(), scope, ctx, 0));
+        }
         String whereClause = renderWhere(model.getWhere(), scope, ctx, 0).toString();
+        if (onConditions.length() > 0) {
+            // ON conditions are pre-merged into the WHERE clause so every
+            // dialect assembles FROM/USING-style statements (see JoinPieces).
+            whereClause = whereClause.isEmpty() ? " WHERE " + onConditions
+                    : whereClause + " AND " + onConditions;
+        }
         Dialect.JoinPieces pieces = new Dialect.JoinPieces(alias, rootDefinition,
-                joinedTables.toString(), joinTableList.toString(), onConditions.toString(),
+                joinTableList.toString(),
                 qualifiedSets.toString(), bareSets.toString(), whereClause);
         String sql = delete ? dialect.deleteJoinSql(pieces) : dialect.updateJoinSql(pieces);
         return ctx.toFragment(sql);

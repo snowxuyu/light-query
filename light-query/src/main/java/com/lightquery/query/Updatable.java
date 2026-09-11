@@ -26,8 +26,8 @@ import java.util.function.Consumer;
  *
  * <pre>{@code
  * int rows = db.updatable(User.class)
- *     .set(User::getStatus, Status.FROZEN)
- *     .eq(User::getId, 5)
+ *     .col(User::getStatus).set(Status.FROZEN)
+ *     .col(User::getId).eq(5)
  *     .execute();
  * }</pre>
  *
@@ -74,7 +74,7 @@ public final class Updatable<T> {
             }
 
             @Override
-            public ColumnResolver.Resolved resolve(TableColumn<?> column) {
+            public ColumnResolver.Resolved resolve(TableColumn<?, ? > column) {
                 throw new SqlBuildException("TableColumn needs a multi-table query — updates are single-table; use the entity lambdas directly");
             }
 
@@ -83,7 +83,7 @@ public final class Updatable<T> {
                 throw new SqlBuildException("Aggregates are only valid in queryable(...).having(...)");
             }
         };
-        this.where = new Where<>(model.getWhere(), resolver);
+        this.where = new Where<>(model.getWhere(), resolver, model::markUsesSubQueries);
     }
 
     // ------------------------------------------------------------------ join
@@ -100,137 +100,83 @@ public final class Updatable<T> {
         ensureOpen();
         TableRef joined = model.addJoin(target);
         ConditionGroup onGroup = new ConditionGroup();
-        on.accept(new JoinOn<>(onGroup, resolver));
+        on.accept(new JoinOn<>(onGroup, resolver, model::markUsesSubQueries));
         model.getJoins().add(new JoinSpec(JoinType.INNER, joined, onGroup));
         return this;
     }
 
-    // ------------------------------------------------------------------ SET
+    // ------------------------------------------------------------------ strongly-typed columns
 
-    public <C> Updatable<T> set(SFunction<C, ?> col, Object value) {
+    /**
+     * Starts a strongly-typed column handle: carries the SET family (updated
+     * entity only — {@code set} on a joined column fails at runtime) plus the
+     * condition family (any joined table), all checked against the property
+     * type at compile time.
+     */
+    public <C, V> UpdatableColumn<T, V> col(SFunction<C, V> col) {
         ensureOpen();
-        sets.add(SqlBuilder.SetClause.of(columnOf(col), metaOf(col).toDbValue(value)));
-        return this;
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new UpdatableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
+                resolver, isRootColumn(col));
     }
 
-    public <C> Updatable<T> setNull(SFunction<C, ?> col) {
+    /**
+     * Starts a range condition handle; only {@link Comparable} properties
+     * compile here. SET methods remain available on updated-entity columns.
+     */
+    public <C, V extends Comparable<V>> UpdatableComparableColumn<T, V> cmpCol(SFunction<C, V> col) {
         ensureOpen();
-        sets.add(SqlBuilder.SetClause.of(columnOf(col), null));
-        return this;
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new UpdatableComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
+                resolver, isRootColumn(col));
     }
 
-    /** Numeric self-increment: {@code col = col + delta} (negative delta decrements). */
-    public <C> Updatable<T> setIncrement(SFunction<C, ?> col, long delta) {
+    /** Starts a text-match handle for a {@code String} property. */
+    public <C> UpdatableStringColumn<T> strCol(SFunction<C, String> col) {
         ensureOpen();
-        sets.add(SqlBuilder.SetClause.increment(columnOf(col), delta));
-        return this;
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new UpdatableStringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
+                resolver, isRootColumn(col));
     }
 
-    // ------------------------------------------------------------------ conditions (delegates to Where)
-
-    public <C> Updatable<T> eq(SFunction<C, ?> col, Object value) {
+    /**
+     * Starts a numeric handle: carries {@code setIncrement} (updated entity
+     * only) plus the comparison family.
+     */
+    public <C, V extends Number & Comparable<V>> UpdatableNumberColumn<T, V> numCol(SFunction<C, V> col) {
         ensureOpen();
-        where.eq(col, value);
-        return this;
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new UpdatableNumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
+                resolver, isRootColumn(col));
     }
 
-    public <C> Updatable<T> ne(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.ne(col, value);
-        return this;
-    }
-
-    public <C> Updatable<T> gt(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.gt(col, value);
-        return this;
-    }
-
-    public <C> Updatable<T> ge(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.ge(col, value);
-        return this;
-    }
-
-    public <C> Updatable<T> lt(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.lt(col, value);
-        return this;
-    }
-
-    public <C> Updatable<T> le(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.le(col, value);
-        return this;
-    }
-
-    /** Prefix match with {code \ % _} escaped. */
-    public <C> Updatable<T> startsWith(SFunction<C, ?> col, String prefix) {
-        ensureOpen();
-        where.startsWith(col, prefix);
-        return this;
-    }
-
-    /** Suffix match with {code \ % _} escaped. */
-    public <C> Updatable<T> endsWith(SFunction<C, ?> col, String suffix) {
-        ensureOpen();
-        where.endsWith(col, suffix);
-        return this;
-    }
-
-    public <C> Updatable<T> like(SFunction<C, ?> col, String contains) {
-        ensureOpen();
-        where.like(col, contains);
-        return this;
-    }
-
-    public Updatable<T> in(SFunction<?, ?> col, Collection<?> values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    @SafeVarargs
-    public final <C> Updatable<T> in(SFunction<C, ?> col, Object... values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    public Updatable<T> notIn(SFunction<?, ?> col, Collection<?> values) {
-        ensureOpen();
-        where.notIn(col, values);
-        return this;
-    }
-
-    public <C> Updatable<T> isNull(SFunction<C, ?> col) {
-        ensureOpen();
-        where.isNull(col);
-        return this;
-    }
-
-    public <C> Updatable<T> isNotNull(SFunction<C, ?> col) {
-        ensureOpen();
-        where.isNotNull(col);
-        return this;
-    }
-
-    public <C> Updatable<T> between(SFunction<C, ?> col, Object lo, Object hi) {
-        ensureOpen();
-        where.between(col, lo, hi);
-        return this;
-    }
-
+    /** Adds a parenthesised AND group. */
     public Updatable<T> and(Consumer<Where<T>> group) {
         ensureOpen();
         where.and(group);
         return this;
     }
 
+    /** Adds a parenthesised group joined by OR. */
     public Updatable<T> or(Consumer<Where<T>> group) {
         ensureOpen();
         where.or(group);
         return this;
+    }
+
+    private boolean isRootColumn(SFunction<?, ?> col) {
+        Class<?> lambdaClass = LambdaUtils.getImplClass(col);
+        return model.getRoot().getEntityClass().isAssignableFrom(lambdaClass);
+    }
+
+    /** Adds a rendered SET entry (package seam for {@link UpdatableColumn}). */
+    void addSet(String column, Object value) {
+        sets.add(SqlBuilder.SetClause.of(column, value));
+    }
+
+    /** Adds a rendered self-increment SET entry (package seam). */
+    void addIncrement(String column, long delta) {
+        sets.add(SqlBuilder.SetClause.increment(column, delta));
     }
 
     /** Skips the automatic logic-delete restriction for this update. */
@@ -286,32 +232,6 @@ public final class Updatable<T> {
     }
 
     // ------------------------------------------------------------------ internals
-
-    private String columnOf(SFunction<?, ?> col) {
-        ColumnMeta meta = metaOf(col);
-        if (meta.isPrimaryKey()) {
-            throw new SqlBuildException("set(...) cannot modify primary key column '"
-                    + meta.getColumnName() + "'");
-        }
-        return meta.getColumnName();
-    }
-
-    private ColumnMeta metaOf(SFunction<?, ?> col) {
-        Class<?> lambdaClass = LambdaUtils.getImplClass(col);
-        Class<?> rootClass = model.getRoot().getEntityClass();
-        if (!rootClass.isAssignableFrom(lambdaClass)) {
-            throw new SqlBuildException("set(...) modifies the updated entity only — '"
-                    + lambdaClass.getSimpleName()
-                    + "' columns are read-only here. Reference joined tables in conditions instead.");
-        }
-        String property = LambdaUtils.getPropertyName(col);
-        ColumnMeta meta = model.getRoot().getMeta().byProperty(property);
-        if (meta == null) {
-            throw new SqlBuildException(model.getRoot().getMeta().getEntityClass().getSimpleName()
-                    + " has no mapped property '" + property + "'");
-        }
-        return meta;
-    }
 
     private ColumnRef logicColumnRef() {
         ColumnMeta logic = model.getRoot().getMeta().getLogicDeleteColumn();

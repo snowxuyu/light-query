@@ -28,8 +28,8 @@ class TransactionH2Test {
     void commitPersistsAllWork() {
         Long id = h2.db.inTransaction(tx -> {
             tx.insert(h2.user("txCommit", User.Status.ACTIVE, 1, null, null, 0));
-            tx.updatable(User.class).set(User::getRemark, "tx").eq(User::getName, "txCommit").execute();
-            return tx.queryable(User.class).eq(User::getName, "txCommit").firstOrNull().getId();
+            tx.updatable(User.class).col(User::getRemark).set("tx").col(User::getName).eq("txCommit").execute();
+            return tx.queryable(User.class).col(User::getName).eq("txCommit").firstOrNull().getId();
         });
         assertEquals("tx", h2.db.queryById(User.class, id).getRemark());
     }
@@ -40,7 +40,7 @@ class TransactionH2Test {
             tx.insert(h2.user("txRollback", User.Status.ACTIVE, 1, null, null, 0));
             throw new IllegalStateException("boom");
         }));
-        assertEquals(0, h2.db.queryable(User.class).eq(User::getName, "txRollback").count());
+        assertEquals(0, h2.db.queryable(User.class).col(User::getName).eq("txRollback").count());
     }
 
     @Test
@@ -53,7 +53,7 @@ class TransactionH2Test {
             }
             return null;
         }));
-        assertEquals(0, h2.db.queryable(User.class).eq(User::getName, "txFail").count());
+        assertEquals(0, h2.db.queryable(User.class).col(User::getName).eq("txFail").count());
     }
 
     @Test
@@ -63,7 +63,7 @@ class TransactionH2Test {
             return "nested-ok";
         }));
         assertEquals("nested-ok", name);
-        assertEquals(1, h2.db.queryable(User.class).eq(User::getName, "nested").count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getName).eq("nested").count());
     }
 
     @Test
@@ -71,11 +71,11 @@ class TransactionH2Test {
         h2.db.inTransaction(tx -> {
             tx.insert(h2.user("isolation", User.Status.ACTIVE, 1, null, null, 0));
             // a fresh connection (different transaction) must not see the row yet
-            long visible = h2.db.queryable(User.class).eq(User::getName, "isolation").count();
+            long visible = h2.db.queryable(User.class).col(User::getName).eq("isolation").count();
             assertEquals(0, visible);
             return null;
         });
-        assertEquals(1, h2.db.queryable(User.class).eq(User::getName, "isolation").count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getName).eq("isolation").count());
         assertTrue(true);
     }
 }

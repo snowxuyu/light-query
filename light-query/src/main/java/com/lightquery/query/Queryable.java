@@ -37,8 +37,8 @@ import java.util.function.Consumer;
  *
  * <pre>{@code
  * List<User> users = LightQuery.queryable(User.class)
- *     .eq(User::getStatus, Status.ACTIVE)
- *     .and(w -> w.like(User::getName, "frank").or().ge(User::getAge, 18))
+ *     .col(User::getStatus).eq(Status.ACTIVE)
+ *     .and(w -> w.col(User::getName).like("frank").or().col(User::getAge).ge(18))
  *     .orderByDesc(User::getCreateTime)
  *     .limit(10)
  *     .toList();
@@ -82,7 +82,7 @@ public final class Queryable<T> {
             }
 
             @Override
-            public ColumnResolver.Resolved resolve(TableColumn<?> column) {
+            public ColumnResolver.Resolved resolve(TableColumn<?, ? > column) {
                 return Queryable.this.resolve(column);
             }
 
@@ -91,123 +91,80 @@ public final class Queryable<T> {
                 return Queryable.this.resolveAggregate(aggregate);
             }
         };
-        this.where = new Where<>(model.getWhere(), resolver);
+        this.where = new Where<>(model.getWhere(), resolver, model::markUsesSubQueries);
     }
 
-    // ------------------------------------------------------------------ conditions (top level: ANDed)
+    // ------------------------------------------------------------------ strongly-typed conditions
 
-    public <C> Queryable<T> eq(SFunction<C, ?> col, Object value) {
+    /**
+     * Starts a strongly-typed condition on a property — the value type of
+     * the property lambda drives the condition, e.g.
+     * {@code .col(User::getAge).ge(18)}. The property may belong to any
+     * table in scope (root or joined).
+     */
+    public <C, V> TypedColumn<Queryable<T>, V> col(SFunction<C, V> col) {
         ensureOpen();
-        where.eq(col, value);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(col);
+        return new TypedColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    public <C> Queryable<T> ne(SFunction<C, ?> col, Object value) {
+    /**
+     * Starts a range condition on a {@link Comparable} property, e.g.
+     * {@code .cmpCol(User::getAge).ge(18)}. Non-comparable properties do not
+     * compile here — use {@link #col(SFunction)} for equality.
+     */
+    public <C, V extends Comparable<V>> ComparableColumn<Queryable<T>, V> cmpCol(SFunction<C, V> col) {
         ensureOpen();
-        where.ne(col, value);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(col);
+        return new ComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    public <C> Queryable<T> gt(SFunction<C, ?> col, Object value) {
+    /**
+     * Starts a text-match condition on a {@code String} property, e.g.
+     * {@code .strCol(User::getName).like("frank")}.
+     */
+    public <C> StringColumn<Queryable<T>> strCol(SFunction<C, String> col) {
         ensureOpen();
-        where.gt(col, value);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(col);
+        return new StringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    public <C> Queryable<T> ge(SFunction<C, ?> col, Object value) {
+    /**
+     * Starts a numeric condition on a {@link Number} property, e.g.
+     * {@code .numCol(Order::getAmount).gt(new BigDecimal("100"))}.
+     */
+    public <C, V extends Number & Comparable<V>> NumberColumn<Queryable<T>, V> numCol(SFunction<C, V> col) {
         ensureOpen();
-        where.ge(col, value);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(col);
+        return new NumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    public <C> Queryable<T> lt(SFunction<C, ?> col, Object value) {
+    /** Strongly-typed condition on a self-join occurrence column. */
+    public <V> TypedColumn<Queryable<T>, V> col(TableColumn<?, V> column) {
         ensureOpen();
-        where.lt(col, value);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(column);
+        return new TypedColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    public <C> Queryable<T> le(SFunction<C, ?> col, Object value) {
+    /** Range condition on a self-join occurrence column of comparable type. */
+    public <V extends Comparable<V>> ComparableColumn<Queryable<T>, V> cmpCol(TableColumn<?, V> column) {
         ensureOpen();
-        where.le(col, value);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(column);
+        return new ComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    /** Contains match with {@code \ % _} escaped. */
-    public <C> Queryable<T> like(SFunction<C, ?> col, String contains) {
+    /** Text-match condition on a self-join occurrence column of string type. */
+    public StringColumn<Queryable<T>> strCol(TableColumn<?, String> column) {
         ensureOpen();
-        where.like(col, contains);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(column);
+        return new StringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    public <C> Queryable<T> notLike(SFunction<C, ?> col, String contains) {
+    /** Numeric condition on a self-join occurrence column of numeric type. */
+    public <V extends Number & Comparable<V>> NumberColumn<Queryable<T>, V> numCol(TableColumn<?, V> column) {
         ensureOpen();
-        where.notLike(col, contains);
-        return this;
-    }
-
-    public <C> Queryable<T> startsWith(SFunction<C, ?> col, String prefix) {
-        ensureOpen();
-        where.startsWith(col, prefix);
-        return this;
-    }
-
-    public <C> Queryable<T> endsWith(SFunction<C, ?> col, String suffix) {
-        ensureOpen();
-        where.endsWith(col, suffix);
-        return this;
-    }
-
-    /** Matches any value; an empty collection renders {@code 1 = 0}. */
-    public <C> Queryable<T> in(SFunction<C, ?> col, Collection<?> values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    @SafeVarargs
-    public final <C> Queryable<T> in(SFunction<C, ?> col, Object... values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    /** Excludes every value; an empty collection renders {@code 1 = 1}. */
-    public <C> Queryable<T> notIn(SFunction<C, ?> col, Collection<?> values) {
-        ensureOpen();
-        where.notIn(col, values);
-        return this;
-    }
-
-    @SafeVarargs
-    public final <C> Queryable<T> notIn(SFunction<C, ?> col, Object... values) {
-        ensureOpen();
-        where.notIn(col, values);
-        return this;
-    }
-
-    public <C> Queryable<T> isNull(SFunction<C, ?> col) {
-        ensureOpen();
-        where.isNull(col);
-        return this;
-    }
-
-    public <C> Queryable<T> isNotNull(SFunction<C, ?> col) {
-        ensureOpen();
-        where.isNotNull(col);
-        return this;
-    }
-
-    /** Inclusive range. */
-    public <C> Queryable<T> between(SFunction<C, ?> col, Object lo, Object hi) {
-        ensureOpen();
-        where.between(col, lo, hi);
-        return this;
-    }
-
-    public <C> Queryable<T> notBetween(SFunction<C, ?> col, Object lo, Object hi) {
-        ensureOpen();
-        where.notBetween(col, lo, hi);
-        return this;
+        ColumnResolver.Resolved resolved = resolve(column);
+        return new NumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
     /** Adds a parenthesised AND group. */
@@ -224,225 +181,39 @@ public final class Queryable<T> {
         return this;
     }
 
-    // --------------------------------------------- column-to-column (joins, correlated sub-queries)
-
-    public <C, D> Queryable<T> eqColumn(SFunction<C, ?> a, SFunction<D, ?> b) {
-        ensureOpen();
-        where.eqColumn(a, b);
-        return this;
-    }
-
-    public <C, D> Queryable<T> neColumn(SFunction<C, ?> a, SFunction<D, ?> b) {
-        ensureOpen();
-        where.neColumn(a, b);
-        return this;
-    }
-
-    public <C, D> Queryable<T> gtColumn(SFunction<C, ?> a, SFunction<D, ?> b) {
-        ensureOpen();
-        where.gtColumn(a, b);
-        return this;
-    }
-
-    public <C, D> Queryable<T> geColumn(SFunction<C, ?> a, SFunction<D, ?> b) {
-        ensureOpen();
-        where.geColumn(a, b);
-        return this;
-    }
-
-    public <C, D> Queryable<T> ltColumn(SFunction<C, ?> a, SFunction<D, ?> b) {
-        ensureOpen();
-        where.ltColumn(a, b);
-        return this;
-    }
-
-    public <C, D> Queryable<T> leColumn(SFunction<C, ?> a, SFunction<D, ?> b) {
-        ensureOpen();
-        where.leColumn(a, b);
-        return this;
-    }
-
-    // ------------------------------------------------- TableColumn (self-join occurrences)
-
-    public Queryable<T> eq(TableColumn<?> col, Object value) {
-        ensureOpen();
-        where.eq(col, value);
-        return this;
-    }
-
-    public Queryable<T> ne(TableColumn<?> col, Object value) {
-        ensureOpen();
-        where.ne(col, value);
-        return this;
-    }
-
-    public Queryable<T> gt(TableColumn<?> col, Object value) {
-        ensureOpen();
-        where.gt(col, value);
-        return this;
-    }
-
-    public Queryable<T> ge(TableColumn<?> col, Object value) {
-        ensureOpen();
-        where.ge(col, value);
-        return this;
-    }
-
-    public Queryable<T> lt(TableColumn<?> col, Object value) {
-        ensureOpen();
-        where.lt(col, value);
-        return this;
-    }
-
-    public Queryable<T> le(TableColumn<?> col, Object value) {
-        ensureOpen();
-        where.le(col, value);
-        return this;
-    }
-
-    public Queryable<T> like(TableColumn<?> col, String contains) {
-        ensureOpen();
-        where.like(col, contains);
-        return this;
-    }
-
-    public Queryable<T> notLike(TableColumn<?> col, String contains) {
-        ensureOpen();
-        where.notLike(col, contains);
-        return this;
-    }
-
-    public Queryable<T> startsWith(TableColumn<?> col, String prefix) {
-        ensureOpen();
-        where.startsWith(col, prefix);
-        return this;
-    }
-
-    public Queryable<T> endsWith(TableColumn<?> col, String suffix) {
-        ensureOpen();
-        where.endsWith(col, suffix);
-        return this;
-    }
-
-    public Queryable<T> in(TableColumn<?> col, Collection<?> values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    @SafeVarargs
-    public final Queryable<T> in(TableColumn<?> col, Object... values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    public Queryable<T> notIn(TableColumn<?> col, Collection<?> values) {
-        ensureOpen();
-        where.notIn(col, values);
-        return this;
-    }
-
-    @SafeVarargs
-    public final Queryable<T> notIn(TableColumn<?> col, Object... values) {
-        ensureOpen();
-        where.notIn(col, values);
-        return this;
-    }
-
-    public Queryable<T> isNull(TableColumn<?> col) {
-        ensureOpen();
-        where.isNull(col);
-        return this;
-    }
-
-    public Queryable<T> isNotNull(TableColumn<?> col) {
-        ensureOpen();
-        where.isNotNull(col);
-        return this;
-    }
-
-    public Queryable<T> between(TableColumn<?> col, Object lo, Object hi) {
-        ensureOpen();
-        where.between(col, lo, hi);
-        return this;
-    }
-
-    public Queryable<T> notBetween(TableColumn<?> col, Object lo, Object hi) {
-        ensureOpen();
-        where.notBetween(col, lo, hi);
-        return this;
-    }
-
-    public Queryable<T> eqColumn(TableColumn<?> a, TableColumn<?> b) {
-        ensureOpen();
-        where.eqColumn(a, b);
-        return this;
-    }
-
-    public Queryable<T> neColumn(TableColumn<?> a, TableColumn<?> b) {
-        ensureOpen();
-        where.neColumn(a, b);
-        return this;
-    }
-
-    public Queryable<T> gtColumn(TableColumn<?> a, TableColumn<?> b) {
-        ensureOpen();
-        where.gtColumn(a, b);
-        return this;
-    }
-
-    public Queryable<T> geColumn(TableColumn<?> a, TableColumn<?> b) {
-        ensureOpen();
-        where.geColumn(a, b);
-        return this;
-    }
-
-    public Queryable<T> ltColumn(TableColumn<?> a, TableColumn<?> b) {
-        ensureOpen();
-        where.ltColumn(a, b);
-        return this;
-    }
-
-    public Queryable<T> leColumn(TableColumn<?> a, TableColumn<?> b) {
-        ensureOpen();
-        where.leColumn(a, b);
-        return this;
-    }
-
     // ------------------------------------------------------------------ sub-queries
 
     /** {@code col IN (SELECT …)} — correlated references to outer entities work. */
-    public <C> Queryable<T> in(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> in(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.IN, subQuery);
     }
 
-    public <C> Queryable<T> notIn(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> notIn(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.NOT_IN, subQuery);
     }
 
     /** Scalar sub-query comparison: {@code col = (SELECT …)}. */
-    public <C> Queryable<T> eqSubQuery(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> eqSubQuery(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.EQ, subQuery);
     }
 
-    public <C> Queryable<T> neSubQuery(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> neSubQuery(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.NE, subQuery);
     }
 
-    public <C> Queryable<T> gtSubQuery(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> gtSubQuery(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.GT, subQuery);
     }
 
-    public <C> Queryable<T> geSubQuery(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> geSubQuery(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.GE, subQuery);
     }
 
-    public <C> Queryable<T> ltSubQuery(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> ltSubQuery(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.LT, subQuery);
     }
 
-    public <C> Queryable<T> leSubQuery(SFunction<C, ?> col, Queryable<?> subQuery) {
+    public <C, V> Queryable<T> leSubQuery(SFunction<C, V> col, Queryable<?> subQuery) {
         return addSubQueryCondition(col, Operator.LE, subQuery);
     }
 
@@ -502,7 +273,7 @@ public final class Queryable<T> {
         ensureOpen();
         TableRef joined = model.addJoin(target);
         ConditionGroup onGroup = new ConditionGroup();
-        on.accept(new JoinOn<>(onGroup, resolver));
+        on.accept(new JoinOn<>(onGroup, resolver, model::markUsesSubQueries));
         model.getJoins().add(new JoinSpec(type, joined, onGroup));
         return this;
     }
@@ -511,7 +282,7 @@ public final class Queryable<T> {
         ensureOpen();
         TableRef joined = model.addJoin(target);
         ConditionGroup onGroup = new ConditionGroup();
-        on.accept(new JoinOn<>(onGroup, resolver));
+        on.accept(new JoinOn<>(onGroup, resolver, model::markUsesSubQueries));
         model.getJoins().add(new JoinSpec(type, joined, onGroup));
         return this;
     }
@@ -538,9 +309,9 @@ public final class Queryable<T> {
     }
 
     /** Occurrence-bound projection (self-join), e.g. {@code select(manager.col(Employee::getName))}. */
-    public Queryable<T> select(TableColumn<?>... columns) {
+    public Queryable<T> select(TableColumn<?, ? >... columns) {
         ensureOpen();
-        for (TableColumn<?> column : columns) {
+        for (TableColumn<?, ? > column : columns) {
             model.getSelectExprs().add(resolve(column).ref());
         }
         return this;
@@ -562,9 +333,9 @@ public final class Queryable<T> {
     }
 
     /** Occurrence-bound grouping (self-join). */
-    public Queryable<T> groupBy(TableColumn<?>... columns) {
+    public Queryable<T> groupBy(TableColumn<?, ? >... columns) {
         ensureOpen();
-        for (TableColumn<?> column : columns) {
+        for (TableColumn<?, ? > column : columns) {
             model.getGroupBys().add(resolve(column).ref());
         }
         return this;
@@ -572,7 +343,7 @@ public final class Queryable<T> {
 
     public Queryable<T> having(Consumer<Where<T>> group) {
         ensureOpen();
-        group.accept(new Where<>(model.getHaving(), resolver));
+        group.accept(new Where<>(model.getHaving(), resolver, model::markUsesSubQueries));
         return this;
     }
 
@@ -599,12 +370,12 @@ public final class Queryable<T> {
 
     /** Occurrence-bound ordering (self-join). */
     @SafeVarargs
-    public final Queryable<T> orderByAsc(TableColumn<?>... columns) {
+    public final Queryable<T> orderByAsc(TableColumn<?, ? >... columns) {
         return orderBy(columns, true);
     }
 
     @SafeVarargs
-    public final Queryable<T> orderByDesc(TableColumn<?>... columns) {
+    public final Queryable<T> orderByDesc(TableColumn<?, ? >... columns) {
         return orderBy(columns, false);
     }
 
@@ -689,22 +460,22 @@ public final class Queryable<T> {
     }
 
     /** {@code sum(col)}: BigDecimal, {@code 0} when no rows. */
-    public <C> Number sum(SFunction<C, ?> col) {
+    public <C, V extends Number> Number sum(SFunction<C, V> col) {
         return aggregate("sum", col, true);
     }
 
     /** {@code avg(col)}: BigDecimal, {@code null} when no rows. */
-    public <C> Number avg(SFunction<C, ?> col) {
+    public <C, V extends Number> Number avg(SFunction<C, V> col) {
         return aggregate("avg", col, false);
     }
 
     /** {@code max(col)}: driver-native number, {@code null} when no rows. */
-    public <C> Number max(SFunction<C, ?> col) {
+    public <C, V extends Number> Number max(SFunction<C, V> col) {
         return aggregate("max", col, false);
     }
 
     /** {@code min(col)}: driver-native number, {@code null} when no rows. */
-    public <C> Number min(SFunction<C, ?> col) {
+    public <C, V extends Number> Number min(SFunction<C, V> col) {
         return aggregate("min", col, false);
     }
 
@@ -784,7 +555,7 @@ public final class Queryable<T> {
      *         count does not match the sort columns, when a value is null, or
      *         when the sort uses an aggregate/alias expression
      */
-    public Queryable<T> seekAfter(Object... values) {
+    public Queryable<T> seekAfter(Comparable<?>... values) {
         ensureOpen();
         List<OrderBy> orders = model.getOrderBys();
         if (orders.isEmpty()) {
@@ -883,9 +654,9 @@ public final class Queryable<T> {
         return this;
     }
 
-    private Queryable<T> orderBy(TableColumn<?>[] columns, boolean asc) {
+    private Queryable<T> orderBy(TableColumn<?, ? >[] columns, boolean asc) {
         ensureOpen();
-        for (TableColumn<?> column : columns) {
+        for (TableColumn<?, ? > column : columns) {
             model.getOrderBys().add(new OrderBy.ByExpr(resolve(column).ref(), asc));
         }
         return this;
@@ -971,7 +742,7 @@ public final class Queryable<T> {
     }
 
     /** Resolves an occurrence-bound column (self-join) via its explicit alias. */
-    private ColumnResolver.Resolved resolve(TableColumn<?> column) {
+    private ColumnResolver.Resolved resolve(TableColumn<?, ? > column) {
         String alias = column.table().alias();
         TableRef table = model.findTableByAlias(alias);
         if (table == null) {
@@ -1008,6 +779,11 @@ public final class Queryable<T> {
         }
         ColumnRef argument = resolve(aggregate.property()).ref();
         return new Expr(aggregate.function(), argument, aggregate.distinct(), aggregate.alias());
+    }
+
+    /** The query model (package seam for sub-query composition). */
+    QueryModel model() {
+        return model;
     }
 
     private EntityMeta rootMeta() {

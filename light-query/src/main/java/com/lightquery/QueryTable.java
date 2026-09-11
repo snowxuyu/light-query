@@ -51,7 +51,7 @@ public final class QueryTable<T> {
     }
 
     /** A column of this occurrence, usable in conditions and projections. */
-    public <V> TableColumn<T> col(SFunction<T, V> property) {
+    public <V> TableColumn<T, V> col(SFunction<T, V> property) {
         return new TableColumn<>(this, property, null);
     }
 

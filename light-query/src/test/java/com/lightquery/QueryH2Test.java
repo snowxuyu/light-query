@@ -39,35 +39,35 @@ class QueryH2Test {
     @Test
     void likeEscapesUserWildcards() {
         // the literal name "frank%like" must match exactly, not widen the pattern
-        List<User> rows = h2.db.queryable(User.class).like(User::getName, "frank%").toList();
+        List<User> rows = h2.db.queryable(User.class).strCol(User::getName).like("frank%").toList();
         assertEquals(1, rows.size());
         assertEquals("frank%like", rows.get(0).getName());
     }
 
     @Test
     void startsWithAndEndsWith() {
-        assertEquals(2, h2.db.queryable(User.class).startsWith(User::getName, "frank").count());
-        assertEquals(2, h2.db.queryable(User.class).endsWith(User::getName, "e").count());
+        assertEquals(2, h2.db.queryable(User.class).strCol(User::getName).startsWith("frank").count());
+        assertEquals(2, h2.db.queryable(User.class).strCol(User::getName).endsWith("e").count());
     }
 
     @Test
     void inAndBetween() {
-        assertEquals(2, h2.db.queryable(User.class).in(User::getName, "frank", "alice").count());
-        assertEquals(2, h2.db.queryable(User.class).between(User::getAge, 20, 35).count());
+        assertEquals(2, h2.db.queryable(User.class).col(User::getName).in("frank", "alice").count());
+        assertEquals(2, h2.db.queryable(User.class).cmpCol(User::getAge).between(20, 35).count());
     }
 
     @Test
     void nullSemantics() {
-        assertEquals(1, h2.db.queryable(User.class).isNull(User::getBalance).count());
-        assertEquals(3, h2.db.queryable(User.class).isNotNull(User::getBalance).count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getBalance).isNull().count());
+        assertEquals(3, h2.db.queryable(User.class).col(User::getBalance).isNotNull().count());
     }
 
     @Test
     void nestedGroups() {
         // status=ACTIVE AND (age < 18 OR balance >= 200)
         List<User> rows = h2.db.queryable(User.class)
-                .eq(User::getStatus, User.Status.ACTIVE)
-                .and(w -> w.lt(User::getAge, 18).or().ge(User::getBalance, new BigDecimal("200")))
+                .col(User::getStatus).eq(User.Status.ACTIVE)
+                .and(w -> w.cmpCol(User::getAge).lt(18).or().cmpCol(User::getBalance).ge(new BigDecimal("200")))
                 .toList();
         assertEquals(2, rows.size());
     }
@@ -99,18 +99,18 @@ class QueryH2Test {
 
     @Test
     void existsAndCount() {
-        assertTrue(h2.db.queryable(User.class).eq(User::getName, "alice").exists());
-        assertFalse(h2.db.queryable(User.class).eq(User::getName, "nobody").exists());
-        assertEquals(3, h2.db.queryable(User.class).eq(User::getStatus, User.Status.ACTIVE).count());
+        assertTrue(h2.db.queryable(User.class).col(User::getName).eq("alice").exists());
+        assertFalse(h2.db.queryable(User.class).col(User::getName).eq("nobody").exists());
+        assertEquals(3, h2.db.queryable(User.class).col(User::getStatus).eq(User.Status.ACTIVE).count());
     }
 
     @Test
     void aggregateTerminals() {
         assertEquals(new BigDecimal("300.00"), h2.db.queryable(User.class).sum(User::getBalance));
         assertEquals(0, java.math.BigDecimal.ZERO.compareTo(
-                (BigDecimal) h2.db.queryable(User.class).eq(User::getName, "nobody").sum(User::getBalance)));
+                (BigDecimal) h2.db.queryable(User.class).col(User::getName).eq("nobody").sum(User::getBalance)));
         assertEquals(40, h2.db.queryable(User.class).max(User::getAge).intValue());
-        assertNull(h2.db.queryable(User.class).eq(User::getName, "nobody").max(User::getAge));
+        assertNull(h2.db.queryable(User.class).col(User::getName).eq("nobody").max(User::getAge));
     }
 
     @Test

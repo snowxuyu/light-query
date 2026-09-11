@@ -30,7 +30,7 @@ class DialectShapeTest {
     void oraclePaginationAndQuoting() {
         String sql = h2.db.dialect(new OracleDialect())
                 .queryable(User.class)
-                .eq(User::getStatus, User.Status.ACTIVE)
+                .col(User::getStatus).eq(User.Status.ACTIVE)
                 .orderByAsc(User::getId)
                 .limit(20)
                 .toSql();
@@ -69,7 +69,7 @@ class DialectShapeTest {
     void sqlServerEscapesLikeAndSupportsSequences() {
         String sql = h2.db.dialect(new SqlServerDialect())
                 .queryable(User.class)
-                .like(User::getName, "frank")
+                .strCol(User::getName).like("frank")
                 .toSql();
         assertTrue(sql.contains("ESCAPE '\\'"), sql);
         assertEquals("SELECT NEXT VALUE FOR [invoice_seq]",

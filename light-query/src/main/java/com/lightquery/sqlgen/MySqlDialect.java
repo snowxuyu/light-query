@@ -24,13 +24,13 @@ public class MySqlDialect implements Dialect {
 
     @Override
     public String updateJoinSql(JoinPieces p) {
-        return "UPDATE " + p.rootDefinition() + " " + p.joinedTables()
+        return "UPDATE " + p.rootDefinition() + ", " + p.joinTableList()
                 + " SET " + p.setClauseQualified() + p.whereClause();
     }
 
     @Override
     public String deleteJoinSql(JoinPieces p) {
-        return "DELETE " + p.alias() + " FROM " + p.rootDefinition() + " " + p.joinedTables()
+        return "DELETE " + p.alias() + " FROM " + p.rootDefinition() + ", " + p.joinTableList()
                 + p.whereClause();
     }
 }

@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  *
  * // single data source: use LightQuery directly — nothing to specify
  * List<User> users = LightQuery.queryable(User.class)
- *     .eq(User::getStatus, Status.ACTIVE)
+ *     .col(User::getStatus).eq(Status.ACTIVE)
  *     .orderByDesc(User::getCreateTime)
  *     .toList();
  *
@@ -323,9 +323,19 @@ public final class LightQuery {
         return primary().deleteById(entityType, pkValues);
     }
 
+    /** Single-primary-key overload (see {@link LightQuerySession#deleteById(Class, Object)}). */
+    public static <P> int deleteById(Class<?> entityType, P pkValue) {
+        return primary().deleteById(entityType, pkValue);
+    }
+
     /** Same as {@link LightQuerySession#queryById(Class, Object...)} on the primary datasource. */
     public static <T> T queryById(Class<T> entityType, Object... pkValues) {
         return primary().queryById(entityType, pkValues);
+    }
+
+    /** Single-primary-key overload (see {@link LightQuerySession#queryById(Class, Object)}). */
+    public static <T, P> T queryById(Class<T> entityType, P pkValue) {
+        return primary().queryById(entityType, pkValue);
     }
 
     /** Same as {@link LightQuerySession#count(Class)} on the primary datasource. */

@@ -40,14 +40,14 @@ class UpdateJoinTest {
     void mysqlUpdateJoinShape() {
         String sql = h2.db.dialect(new MySqlDialect())
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .set(User::getStatus, User.Status.FROZEN)
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .col(User::getStatus).set(User.Status.FROZEN)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql();
-        assertEquals("UPDATE `t_user` `t0` INNER JOIN `t_order` `t1` "
-                        + "ON `t0`.`id` = `t1`.`user_id` "
+        assertEquals("UPDATE `t_user` `t0`, `t_order` `t1` "
                         + "SET `t0`.`status` = ? "
-                        + "WHERE `t1`.`amount` > ? AND `t0`.`deleted` = ?"
+                        + "WHERE `t1`.`amount` > ? AND `t0`.`deleted` = ? "
+                        + "AND `t0`.`id` = `t1`.`user_id`"
                         + " | params=[FROZEN, 100, 0]",
                 sql);
     }
@@ -56,9 +56,9 @@ class UpdateJoinTest {
     void postgresUpdateJoinShape() {
         String sql = h2.db.dialect(new PostgreSqlDialect())
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .set(User::getStatus, User.Status.FROZEN)
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .col(User::getStatus).set(User.Status.FROZEN)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql();
         assertEquals("UPDATE \"t_user\" \"t0\" SET \"status\" = ? FROM \"t_order\" \"t1\" "
                         + "WHERE \"t1\".\"amount\" > ? AND \"t0\".\"deleted\" = ? "
@@ -71,13 +71,13 @@ class UpdateJoinTest {
     void sqlServerUpdateJoinShape() {
         String sql = h2.db.dialect(new SqlServerDialect())
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .set(User::getStatus, User.Status.FROZEN)
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .col(User::getStatus).set(User.Status.FROZEN)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql();
-        assertEquals("UPDATE [t0] SET [t0].[status] = ? FROM [t_user] [t0] "
-                        + "INNER JOIN [t_order] [t1] ON [t0].[id] = [t1].[user_id] "
-                        + "WHERE [t1].[amount] > ? AND [t0].[deleted] = ?"
+        assertEquals("UPDATE [t0] SET [t0].[status] = ? FROM [t_user] [t0], [t_order] [t1] "
+                        + "WHERE [t1].[amount] > ? AND [t0].[deleted] = ? "
+                        + "AND [t0].[id] = [t1].[user_id]"
                         + " | params=[FROZEN, 100, 0]",
                 sql);
     }
@@ -86,9 +86,9 @@ class UpdateJoinTest {
     void incrementIsQualifiedInJoinUpdates() {
         String sql = h2.db.dialect(new MySqlDialect())
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .setIncrement(User::getAge, 1)
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .numCol(User::getAge).setIncrement(1)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql();
         assertTrue(sql.contains("SET `t0`.`age` = `t0`.`age` + ?"), sql);
     }
@@ -97,13 +97,12 @@ class UpdateJoinTest {
     void logicDeleteJoinBecomesUpdateWithJoin() {
         String sql = h2.db.dialect(new MySqlDialect())
                 .deletable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql();
-        assertEquals("UPDATE `t_user` `t0` INNER JOIN `t_order` `t1` "
-                        + "ON `t0`.`id` = `t1`.`user_id` "
+        assertEquals("UPDATE `t_user` `t0`, `t_order` `t1` "
                         + "SET `t0`.`deleted` = ? "
-                        + "WHERE `t1`.`amount` > ?"
+                        + "WHERE `t1`.`amount` > ? AND `t0`.`id` = `t1`.`user_id`"
                         + " | params=[1, 100]",
                 sql);
     }
@@ -112,21 +111,20 @@ class UpdateJoinTest {
     void physicalDeleteJoinShapes() {
         String mysql = h2.db.dialect(new MySqlDialect())
                 .deletable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .physical()
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql();
-        assertEquals("DELETE `t0` FROM `t_user` `t0` INNER JOIN `t_order` `t1` "
-                        + "ON `t0`.`id` = `t1`.`user_id` "
-                        + "WHERE `t1`.`amount` > ?"
+        assertEquals("DELETE `t0` FROM `t_user` `t0`, `t_order` `t1` "
+                        + "WHERE `t1`.`amount` > ? AND `t0`.`id` = `t1`.`user_id`"
                         + " | params=[100]",
                 mysql);
 
         String pg = h2.db.dialect(new PostgreSqlDialect())
                 .deletable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .physical()
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql();
         assertEquals("DELETE FROM \"t_user\" \"t0\" USING \"t_order\" \"t1\" "
                         + "WHERE \"t1\".\"amount\" > ? AND \"t0\".\"id\" = \"t1\".\"user_id\""
@@ -138,18 +136,18 @@ class UpdateJoinTest {
     void h2DoesNotSupportJoinWrites() {
         SqlBuildException updateError = assertThrows(SqlBuildException.class, () -> h2.db
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .set(User::getStatus, User.Status.FROZEN)
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .col(User::getStatus).set(User.Status.FROZEN)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .execute());
         assertTrue(updateError.getMessage().contains("does not support UPDATE with JOIN"),
                 updateError.getMessage());
 
         SqlBuildException deleteError = assertThrows(SqlBuildException.class, () -> h2.db
                 .deletable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .physical()
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .execute());
         assertTrue(deleteError.getMessage().contains("does not support DELETE with JOIN"),
                 deleteError.getMessage());
@@ -160,9 +158,9 @@ class UpdateJoinTest {
         SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
                 .dialect(new OracleDialect())
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .set(User::getStatus, User.Status.FROZEN)
-                .gt(Order::getAmount, BIG_AMOUNT)
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .col(User::getStatus).set(User.Status.FROZEN)
+                .cmpCol(Order::getAmount).gt(BIG_AMOUNT)
                 .toSql());
         assertTrue(e.getMessage().contains("does not support UPDATE with JOIN"), e.getMessage());
     }
@@ -171,8 +169,8 @@ class UpdateJoinTest {
     void setOnJoinedEntityIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .set(Order::getAmount, BIG_AMOUNT));
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .col(Order::getAmount).set(BIG_AMOUNT));
         assertTrue(e.getMessage().contains("modifies the updated entity only"), e.getMessage());
     }
 
@@ -180,7 +178,7 @@ class UpdateJoinTest {
     void conditionOnUnjoinedEntityIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
                 .updatable(User.class)
-                .eq(Order::getAmount, BIG_AMOUNT));
+                .col(Order::getAmount).eq(BIG_AMOUNT));
         assertTrue(e.getMessage().contains("is not part of this update"), e.getMessage());
     }
 
@@ -188,8 +186,8 @@ class UpdateJoinTest {
     void joiningTheSameEntityTwiceIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
                 .updatable(User.class)
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId))
-                .join(Order.class, on -> on.eq(User::getId, Order::getUserId)));
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId)));
         assertTrue(e.getMessage().contains("already part of this query"), e.getMessage());
     }
 }

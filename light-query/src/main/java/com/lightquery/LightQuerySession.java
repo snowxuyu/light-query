@@ -32,7 +32,7 @@ import java.util.function.Function;
  * LightQuerySession db = LightQuery.of(dataSource);   // dialect detected from the JDBC URL
  *
  * List<User> users = db.queryable(User.class)
- *     .eq(User::getStatus, Status.ACTIVE)
+ *     .col(User::getStatus).eq(Status.ACTIVE)
  *     .orderByDesc(User::getCreateTime)
  *     .toList();
  * }</pre>
@@ -133,9 +133,25 @@ public final class LightQuerySession implements QueryExecutor {
         return EntityOperations.deleteById(connections, dialect, entityType, pkValues);
     }
 
+    /**
+     * Deletes by a single primary key value (the common case); composite keys
+     * use {@link #deleteById(Class, Object...)}.
+     */
+    public <P> int deleteById(Class<?> entityType, P pkValue) {
+        return deleteById(entityType, new Object[]{pkValue});
+    }
+
     /** Selects one entity by primary key values; null when absent. */
     public <T> T queryById(Class<T> entityType, Object... pkValues) {
         return EntityOperations.queryById(connections, dialect, entityType, pkValues);
+    }
+
+    /**
+     * Selects one entity by a single primary key value (the common case);
+     * composite keys use {@link #queryById(Class, Object...)}.
+     */
+    public <T, P> T queryById(Class<T> entityType, P pkValue) {
+        return queryById(entityType, new Object[]{pkValue});
     }
 
     /** Counts all rows of the entity's table (logic-delete filter applies). */

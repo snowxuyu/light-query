@@ -29,7 +29,7 @@ class SafetyTest {
     @Test
     void updateWithoutConditionsIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class,
-                () -> h2.db.updatable(User.class).set(User::getAge, 1).execute());
+                () -> h2.db.updatable(User.class).col(User::getAge).set(1).execute());
         assertTrue(e.getMessage().contains("allowFullTable"));
     }
 
@@ -42,7 +42,7 @@ class SafetyTest {
     @Test
     void allowFullTableIsTheExplicitEscapeHatch() {
         int rows = h2.db.updatable(User.class)
-                .set(User::getRemark, "bulk")
+                .col(User::getRemark).set("bulk")
                 .allowFullTable()
                 .execute();
         assertTrue(rows >= 1);
@@ -51,7 +51,7 @@ class SafetyTest {
     @Test
     void primaryKeysCannotBeModifiedViaSet() {
         assertThrows(SqlBuildException.class,
-                () -> h2.db.updatable(User.class).set(User::getId, 1L).allowFullTable().execute());
+                () -> h2.db.updatable(User.class).col(User::getId).set(1L).allowFullTable().execute());
     }
 
     @Test
@@ -72,7 +72,7 @@ class SafetyTest {
         String payload = "x'; DROP TABLE t_user; --";
         h2.db.insert(h2.user(payload, User.Status.ACTIVE, 1, null, null, 0));
         // value matched literally, table still intact
-        assertEquals(1, h2.db.queryable(User.class).eq(User::getName, payload).count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getName).eq(payload).count());
         assertTrue(h2.db.queryable(User.class).count() > 0);
     }
 
@@ -80,7 +80,7 @@ class SafetyTest {
     void likeWildcardsInPayloadCannotWidenPattern() {
         String payload = "100%_match";
         h2.db.insert(h2.user(payload, User.Status.ACTIVE, 2, null, null, 0));
-        assertEquals(1, h2.db.queryable(User.class).like(User::getName, "100%_match").count());
+        assertEquals(1, h2.db.queryable(User.class).strCol(User::getName).like("100%_match").count());
     }
 
     @Test
@@ -94,6 +94,6 @@ class SafetyTest {
     @Test
     void unknownPropertyIsRejected() {
         assertThrows(com.lightquery.exception.MappingException.class,
-                () -> h2.db.queryable(User.class).in(User::getIgnored, List.of("x")));
+                () -> h2.db.queryable(User.class).col(User::getIgnored).in(List.of("x")));
     }
 }

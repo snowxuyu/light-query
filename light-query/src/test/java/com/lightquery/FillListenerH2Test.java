@@ -67,7 +67,7 @@ class FillListenerH2Test {
                 h2.user("fill-b2", User.Status.ACTIVE, 1, null, null, 0)));
         for (User user : users) {
             // batch insert does not back-fill identity ids: resolve by name
-            User loaded = h2.db.queryable(User.class).eq(User::getName, user.getName()).firstOrNull();
+            User loaded = h2.db.queryable(User.class).col(User::getName).eq(user.getName()).firstOrNull();
             assertEquals("filled-insert", loaded.getRemark());
         }
     }
@@ -83,7 +83,7 @@ class FillListenerH2Test {
         try {
             assertThrows(IllegalStateException.class,
                     () -> h2.db.insert(h2.user("fill-fail", User.Status.ACTIVE, 1, null, null, 0)));
-            assertEquals(0, h2.db.queryable(User.class).eq(User::getName, "fill-fail").count());
+            assertEquals(0, h2.db.queryable(User.class).col(User::getName).eq("fill-fail").count());
         } finally {
             LightQuery.setFillListener(new FillListener() {
                 @Override

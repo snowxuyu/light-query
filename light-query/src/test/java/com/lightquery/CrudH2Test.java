@@ -49,9 +49,9 @@ class CrudH2Test {
                 h2.user("batch2", User.Status.FROZEN, 21, "1.00", null, 0));
         h2.db.insertBatch(users);
         assertEquals("batch1", h2.db.queryable(User.class)
-                .eq(User::getName, "batch1").firstOrNull().getName());
+                .col(User::getName).eq("batch1").firstOrNull().getName());
         assertEquals(2, h2.db.queryable(User.class)
-                .startsWith(User::getName, "batch").count());
+                .strCol(User::getName).startsWith("batch").count());
     }
 
     @Test
@@ -107,7 +107,7 @@ class CrudH2Test {
         h2.db.insert(h2.user("cnt-alive", User.Status.ACTIVE, 1, null, null, 0));
         h2.db.insert(h2.user("cnt-dead", User.Status.ACTIVE, 1, null, null, 1)); // deleted
         assertEquals(1, h2.db.queryable(User.class)
-                .startsWith(User::getName, "cnt-").count());
+                .strCol(User::getName).startsWith("cnt-").count());
     }
 
     @Test

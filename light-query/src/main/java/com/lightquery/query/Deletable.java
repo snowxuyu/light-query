@@ -25,8 +25,8 @@ import java.util.function.Consumer;
  * Fluent DELETE builder:
  *
  * <pre>{@code
- * db.deletable(User.class).eq(User::getStatus, 0).execute();   // logic delete
- * db.deletable(User.class).physical().eq(User::getStatus, 0).execute(); // hard delete
+ * db.deletable(User.class).col(User::getStatus).eq(0).execute();   // logic delete
+ * db.deletable(User.class).physical().col(User::getStatus).eq(0).execute(); // hard delete
  * }</pre>
  *
  * <p>When the entity declares {@code @LogicDelete}, execute() becomes an
@@ -70,7 +70,7 @@ public final class Deletable<T> {
             }
 
             @Override
-            public ColumnResolver.Resolved resolve(TableColumn<?> column) {
+            public ColumnResolver.Resolved resolve(TableColumn<?, ? > column) {
                 throw new SqlBuildException("TableColumn needs a multi-table query — deletes are single-table; use the entity lambdas directly");
             }
 
@@ -79,7 +79,7 @@ public final class Deletable<T> {
                 throw new SqlBuildException("Aggregates are only valid in queryable(...).having(...)");
             }
         };
-        this.where = new Where<>(model.getWhere(), resolver);
+        this.where = new Where<>(model.getWhere(), resolver, model::markUsesSubQueries);
     }
 
     // ------------------------------------------------------------------ behaviour
@@ -96,9 +96,41 @@ public final class Deletable<T> {
         ensureOpen();
         TableRef joined = model.addJoin(target);
         ConditionGroup onGroup = new ConditionGroup();
-        on.accept(new JoinOn<>(onGroup, resolver));
+        on.accept(new JoinOn<>(onGroup, resolver, model::markUsesSubQueries));
         model.getJoins().add(new JoinSpec(JoinType.INNER, joined, onGroup));
         return this;
+    }
+
+    /**
+     * Starts a strongly-typed condition on a property — the value type of
+     * the property lambda drives the condition, e.g.
+     * {@code .col(User::getId).eq(5L)}.
+     */
+    public <C, V> TypedColumn<Deletable<T>, V> col(SFunction<C, V> col) {
+        ensureOpen();
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new TypedColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
+    }
+
+    /** Range condition on a {@link Comparable} property. */
+    public <C, V extends Comparable<V>> ComparableColumn<Deletable<T>, V> cmpCol(SFunction<C, V> col) {
+        ensureOpen();
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new ComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
+    }
+
+    /** Text-match condition on a {@code String} property. */
+    public <C> StringColumn<Deletable<T>> strCol(SFunction<C, String> col) {
+        ensureOpen();
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new StringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
+    }
+
+    /** Numeric condition on a {@link Number} property. */
+    public <C, V extends Number & Comparable<V>> NumberColumn<Deletable<T>, V> numCol(SFunction<C, V> col) {
+        ensureOpen();
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new NumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
     /** Forces a physical DELETE even when the entity has a logic-delete column. */
@@ -108,117 +140,24 @@ public final class Deletable<T> {
         return this;
     }
 
-    /** Escape hatch that permits DELETE without any WHERE condition. */
-    public Deletable<T> allowFullTable() {
-        ensureOpen();
-        allowFullTable = true;
-        return this;
-    }
-
-    // ------------------------------------------------------------------ conditions (delegates to Where)
-
-    public <C> Deletable<T> eq(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.eq(col, value);
-        return this;
-    }
-
-    public <C> Deletable<T> ne(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.ne(col, value);
-        return this;
-    }
-
-    public <C> Deletable<T> gt(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.gt(col, value);
-        return this;
-    }
-
-    public <C> Deletable<T> ge(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.ge(col, value);
-        return this;
-    }
-
-    public <C> Deletable<T> lt(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.lt(col, value);
-        return this;
-    }
-
-    public <C> Deletable<T> le(SFunction<C, ?> col, Object value) {
-        ensureOpen();
-        where.le(col, value);
-        return this;
-    }
-
-    /** Prefix match with {code \ % _} escaped. */
-    public <C> Deletable<T> startsWith(SFunction<C, ?> col, String prefix) {
-        ensureOpen();
-        where.startsWith(col, prefix);
-        return this;
-    }
-
-    /** Suffix match with {code \ % _} escaped. */
-    public <C> Deletable<T> endsWith(SFunction<C, ?> col, String suffix) {
-        ensureOpen();
-        where.endsWith(col, suffix);
-        return this;
-    }
-
-    public <C> Deletable<T> like(SFunction<C, ?> col, String contains) {
-        ensureOpen();
-        where.like(col, contains);
-        return this;
-    }
-
-    public Deletable<T> in(SFunction<?, ?> col, Collection<?> values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    @SafeVarargs
-    public final <C> Deletable<T> in(SFunction<C, ?> col, Object... values) {
-        ensureOpen();
-        where.in(col, values);
-        return this;
-    }
-
-    public Deletable<T> notIn(SFunction<?, ?> col, Collection<?> values) {
-        ensureOpen();
-        where.notIn(col, values);
-        return this;
-    }
-
-    public <C> Deletable<T> isNull(SFunction<C, ?> col) {
-        ensureOpen();
-        where.isNull(col);
-        return this;
-    }
-
-    public <C> Deletable<T> isNotNull(SFunction<C, ?> col) {
-        ensureOpen();
-        where.isNotNull(col);
-        return this;
-    }
-
-    public <C> Deletable<T> between(SFunction<C, ?> col, Object lo, Object hi) {
-        ensureOpen();
-        where.between(col, lo, hi);
-        return this;
-    }
-
+    /** Adds a parenthesised AND group. */
     public Deletable<T> and(Consumer<Where<T>> group) {
         ensureOpen();
         where.and(group);
         return this;
     }
 
+    /** Adds a parenthesised group joined by OR. */
     public Deletable<T> or(Consumer<Where<T>> group) {
         ensureOpen();
         where.or(group);
+        return this;
+    }
+
+    /** Escape hatch that permits DELETE without any WHERE condition. */
+    public Deletable<T> allowFullTable() {
+        ensureOpen();
+        allowFullTable = true;
         return this;
     }
 

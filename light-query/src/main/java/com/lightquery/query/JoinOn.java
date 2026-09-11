@@ -8,7 +8,7 @@ import com.lightquery.query.model.Operator;
 
 /**
  * ON-condition builder for joins. The primary form compares two columns of
- * the joined entities: {@code on -> on.eq(User::getId, Order::getUserId)}.
+ * the joined entities: {@code on -> on.col(User::getId).eq(Order::getUserId)}.
  * Self-join occurrences are addressed with {@code TableColumn}s:
  * {@code on.eqColumn(staff.col(Employee::getManagerId), manager.col(Employee::getId))}.
  * Conditions against constant values are also supported; {@code .or()}
@@ -21,85 +21,97 @@ public final class JoinOn<A, B> {
 
     private final ConditionGroup group;
     private final ColumnResolver resolver;
+    private final Runnable onSubQuery;
 
-    JoinOn(ConditionGroup group, ColumnResolver resolver) {
+    JoinOn(ConditionGroup group, ColumnResolver resolver, Runnable onSubQuery) {
         this.group = group;
         this.resolver = resolver;
+        this.onSubQuery = onSubQuery;
     }
 
-    public <C, D> JoinOn<A, B> eq(SFunction<C, ?> colA, SFunction<D, ?> colB) {
-        return addColumns(colA, Operator.EQ, colB);
-    }
-
-    public <C, D> JoinOn<A, B> ne(SFunction<C, ?> colA, SFunction<D, ?> colB) {
-        return addColumns(colA, Operator.NE, colB);
-    }
-
-    public <C, D> JoinOn<A, B> gt(SFunction<C, ?> colA, SFunction<D, ?> colB) {
-        return addColumns(colA, Operator.GT, colB);
-    }
-
-    public <C, D> JoinOn<A, B> ge(SFunction<C, ?> colA, SFunction<D, ?> colB) {
-        return addColumns(colA, Operator.GE, colB);
-    }
-
-    public <C, D> JoinOn<A, B> lt(SFunction<C, ?> colA, SFunction<D, ?> colB) {
-        return addColumns(colA, Operator.LT, colB);
-    }
-
-    public <C, D> JoinOn<A, B> le(SFunction<C, ?> colA, SFunction<D, ?> colB) {
-        return addColumns(colA, Operator.LE, colB);
-    }
+    // --------------------------------------------- column-to-column via typed handles
+    // Use col/cmpCol/strCol(...).eqColumn(...) so both sides share the value type.
+    // (The old eq(colA, colB) wildcard overloads were removed: they allowed
+    // comparing columns of different types.)
 
     // --------------------------------------------- TableColumn (self-join occurrences)
 
-    public JoinOn<A, B> eqColumn(TableColumn<?> colA, TableColumn<?> colB) {
+    public <V> JoinOn<A, B> eqColumn(TableColumn<?, V> colA, TableColumn<?, V> colB) {
         return addColumns(colA, Operator.EQ, colB);
     }
 
-    public JoinOn<A, B> neColumn(TableColumn<?> colA, TableColumn<?> colB) {
+    public <V> JoinOn<A, B> neColumn(TableColumn<?, V> colA, TableColumn<?, V> colB) {
         return addColumns(colA, Operator.NE, colB);
     }
 
-    public JoinOn<A, B> gtColumn(TableColumn<?> colA, TableColumn<?> colB) {
+    public <V> JoinOn<A, B> gtColumn(TableColumn<?, V> colA, TableColumn<?, V> colB) {
         return addColumns(colA, Operator.GT, colB);
     }
 
-    public JoinOn<A, B> geColumn(TableColumn<?> colA, TableColumn<?> colB) {
+    public <V> JoinOn<A, B> geColumn(TableColumn<?, V> colA, TableColumn<?, V> colB) {
         return addColumns(colA, Operator.GE, colB);
     }
 
-    public JoinOn<A, B> ltColumn(TableColumn<?> colA, TableColumn<?> colB) {
+    public <V> JoinOn<A, B> ltColumn(TableColumn<?, V> colA, TableColumn<?, V> colB) {
         return addColumns(colA, Operator.LT, colB);
     }
 
-    public JoinOn<A, B> leColumn(TableColumn<?> colA, TableColumn<?> colB) {
+    public <V> JoinOn<A, B> leColumn(TableColumn<?, V> colA, TableColumn<?, V> colB) {
         return addColumns(colA, Operator.LE, colB);
     }
 
-    /** Constant condition, e.g. {@code on.eq(Order::getStatus, 1)}. */
-    public <C> JoinOn<A, B> eq(SFunction<C, ?> col, Object value) {
+    /** Constant condition, e.g. {@code on.col(Order::getStatus).eq(1)} — strongly typed. */
+    public <C, V> JoinOn<A, B> eq(SFunction<C, V> col, V value) {
         return addValue(col, Operator.EQ, value);
     }
 
-    public <C> JoinOn<A, B> ne(SFunction<C, ?> col, Object value) {
+    public <C, V> JoinOn<A, B> ne(SFunction<C, V> col, V value) {
         return addValue(col, Operator.NE, value);
     }
 
-    public <C> JoinOn<A, B> gt(SFunction<C, ?> col, Object value) {
+    public <C, V> JoinOn<A, B> gt(SFunction<C, V> col, V value) {
         return addValue(col, Operator.GT, value);
     }
 
-    public <C> JoinOn<A, B> ge(SFunction<C, ?> col, Object value) {
+    public <C, V> JoinOn<A, B> ge(SFunction<C, V> col, V value) {
         return addValue(col, Operator.GE, value);
     }
 
-    public <C> JoinOn<A, B> lt(SFunction<C, ?> col, Object value) {
+    public <C, V> JoinOn<A, B> lt(SFunction<C, V> col, V value) {
         return addValue(col, Operator.LT, value);
     }
 
-    public <C> JoinOn<A, B> le(SFunction<C, ?> col, Object value) {
+    public <C, V> JoinOn<A, B> le(SFunction<C, V> col, V value) {
         return addValue(col, Operator.LE, value);
+    }
+
+    /**
+     * Starts a strongly-typed condition on a property — both the constant
+     * family ({@code on.col(User::getId).eq(5L)}) and the column-to-column
+     * family ({@code on.col(User::getId).eqColumn(Order::getUserId)}) are
+     * checked against the property type at compile time.
+     */
+    public <C, V> TypedColumn<JoinOn<A, B>, V> col(SFunction<C, V> col) {
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new TypedColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
+    }
+
+    /** Range ON-condition on a {@link Comparable} property. */
+    public <C, V extends Comparable<V>> ComparableColumn<JoinOn<A, B>, V> cmpCol(SFunction<C, V> col) {
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new ComparableColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
+    }
+
+    /** Text-match ON-condition on a {@code String} property. */
+    public <C> StringColumn<JoinOn<A, B>> strCol(SFunction<C, String> col) {
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new StringColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
+    }
+
+    /** Numeric ON-condition on a {@link Number} property. */
+    public <C, V extends Number & Comparable<V>> NumberColumn<JoinOn<A, B>, V> numCol(SFunction<C, V> col) {
+        ColumnResolver.Resolved resolved = resolver.resolve(col);
+        return new NumberColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
     }
 
     /** Switches the connector of the next added condition to OR. */
@@ -108,12 +120,7 @@ public final class JoinOn<A, B> {
         return this;
     }
 
-    private JoinOn<A, B> addColumns(SFunction<?, ?> colA, Operator operator, SFunction<?, ?> colB) {
-        group.add(Condition.ofColumns(resolver.resolve(colA).ref(), operator, resolver.resolve(colB).ref()));
-        return this;
-    }
-
-    private JoinOn<A, B> addColumns(TableColumn<?> colA, Operator operator, TableColumn<?> colB) {
+    private JoinOn<A, B> addColumns(TableColumn<?, ? > colA, Operator operator, TableColumn<?, ? > colB) {
         group.add(Condition.ofColumns(resolver.resolve(colA).ref(), operator, resolver.resolve(colB).ref()));
         return this;
     }
