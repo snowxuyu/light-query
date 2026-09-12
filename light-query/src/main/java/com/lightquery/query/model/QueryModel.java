@@ -29,6 +29,7 @@ public final class QueryModel {
     private final List<OrderBy> orderBys = new ArrayList<>();
     private Long offset;
     private Long limit;
+    private final List<String> excludedColumns = new ArrayList<>();
     private boolean forUpdate;
     private boolean usesSubQueries;
     /** Rendered as {@code SELECT 1} (used by the exists() terminal). */
@@ -218,6 +219,11 @@ public final class QueryModel {
 
     public void markUsesSubQueries() {
         this.usesSubQueries = true;
+    }
+
+    /** Column names excluded from the default SELECT list (root entity only). */
+    public List<String> getExcludedColumns() {
+        return excludedColumns;
     }
 
     public boolean isExistsProbe() {

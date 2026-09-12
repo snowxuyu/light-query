@@ -211,7 +211,7 @@ public final class SqlBuilder {
             sql.append("1");
         } else if (!model.getSelectExprs().isEmpty()) {
             appendSelectList(model, scope, ctx, depth, sql);
-        } else if (model.getJoins().isEmpty()) {
+        } else if (model.getJoins().isEmpty() && model.getExcludedColumns().isEmpty()) {
             sql.append('*');
         } else {
             // joined query mapped to the root entity: select its columns explicitly
@@ -271,9 +271,15 @@ public final class SqlBuilder {
 
     private static void appendRootColumns(QueryModel model, Scope scope, RenderContext ctx,
                                           StringBuilder sql) {
-        String alias = ctx.dialect().quote(scope.aliasOf(model.getRoot()));
-        appendJoined(sql, model.getRoot().getMeta().getColumns(), ", ",
-                column -> alias + "." + ctx.dialect().quote(column.getColumnName()));
+        boolean aliasMode = scope.aliasMode();
+        String alias = aliasMode ? ctx.dialect().quote(scope.aliasOf(model.getRoot())) : null;
+        var columns = model.getRoot().getMeta().getColumns().stream()
+                .filter(c -> !model.getExcludedColumns().contains(c.getColumnName()))
+                .toList();
+        appendJoined(sql, columns, ", ", column -> {
+            String col = ctx.dialect().quote(column.getColumnName());
+            return aliasMode ? alias + "." + col : col;
+        });
     }
 
     private static CharSequence renderWhere(ConditionGroup where, Scope scope, RenderContext ctx, int depth) {

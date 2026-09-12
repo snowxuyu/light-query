@@ -285,6 +285,20 @@ public final class Queryable<T> {
     }
 
     /** Occurrence-bound projection (self-join), e.g. {@code select(manager.col(Employee::getName))}. */
+    /**
+     * Excludes specific columns from the default SELECT list. Only meaningful
+     * when no explicit {@code select(...)} has been called — after
+     * {@code exclude(...)}, the query renders all root columns except the
+     * excluded ones (instead of {@code SELECT *}).
+     */
+    public <C> Queryable<T> exclude(SFunction<C, ?>... cols) {
+        ensureOpen();
+        for (SFunction<?, ?> col : cols) {
+            model.getExcludedColumns().add(resolve(col).ref().column());
+        }
+        return this;
+    }
+
     public Queryable<T> select(TableColumn<?, ? >... columns) {
         ensureOpen();
         for (TableColumn<?, ? > column : columns) {
