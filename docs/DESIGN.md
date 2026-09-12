@@ -181,7 +181,7 @@ com.lightquery
 LightQuery.primary(dataSource);
 
 // 单数据源：任意位置直接用，无需任何指定
-List<User> users = LightQuery.queryable(User.class).eq(User::getStatus, Status.ACTIVE).toList();
+List<User> users = LightQuery.queryable(User.class).col(User::getStatus).eq(Status.ACTIVE).toList();
 ```
 
 各环境的推荐接入方式（README 会按此展开）：
@@ -278,7 +278,6 @@ public final class LightQuerySession implements QueryExecutor {     // 绑定一
 ```java
 public final class Queryable<T> {
     // ── 条件：调 col(...) 拿列柄（值类型由属性 lambda 在编译期锁定），再在柄上写条件；
-    // 每个方法都返回 builder，链式继续。旧的裸 .eq(col, value) 双参直调已移除，见强类型迁移表（README“条件”）。
     <C, V> TypedColumn<Queryable<T>, V> col(SFunction<C, V> col);
         // 相等族：eq/ne（null → IS NULL / IS NOT NULL）、in/notIn（空集合 → 1=0 / 1=1）、
         // isNull/isNotNull、同值类型列对列 eqColumn/neColumn、in/notIn/标量子查询；
@@ -375,7 +374,7 @@ public final class Tuple {
 ```java
 List<Tuple> rows = LightQuery.queryable(Order.class)
     .select(Order::getStatus, Aggregations.count().as("cnt"), Aggregations.sum(Order::getAmount).as("total"))
-    .gt(Order::getAmount, 100)
+    .col(Order::getAmount).gt(100)
     .groupBy(Order::getStatus)
     .having(w -> w.gt(Aggregations.count(), 2))
     .orderByDesc("cnt")
@@ -424,7 +423,7 @@ Long orderId = LightQuery.inTransaction(tx -> {
     tx.insert(order);                                   // 自增键回填
     tx.updatable(Account.class)
       .setIncrement(Account::getBalance, -order.getAmount())
-      .eq(Account::getId, accountId)
+      .col(Account::getId).eq(accountId)
       .execute();                                       // 影响行数≠1 → UnexpectedRowsException → 回滚
     return order.getId();
 });                                                     // 异常：rollback 后原样抛出
@@ -441,7 +440,7 @@ QueryTable<Employee> staff   = QueryTable.of(Employee.class, "staff");
 
 List<Tuple> rows = LightQuery.queryable(staff)
     .leftJoin(manager, on -> on.eqColumn(staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-    .eq(manager.col(Employee::getStatus), Status.ACTIVE)          // 条件可引用任意 occurrence
+    .col(manager.col(Employee::getStatus)).eq(Status.ACTIVE)          // 条件可引用任意 occurrence
     .select(staff.col(Employee::getName), manager.col(Employee::getName).as("manager_name"))
     .toTupleList();
 ```
@@ -497,14 +496,14 @@ public interface FillListener {
 ```java
 record OrderStat(Long userId, Long orderCount, BigDecimal totalAmount) {}
 
-List<OrderStat> rows = db.queryable(Order.class)
+List<OrderStat> rows = LightQuery.queryable(Order.class)
     .select(Order::getUserId)
     .select(Aggregations.count().as("orderCount"),
             Aggregations.sum(Order::getAmount).as("totalAmount"))
     .groupBy(Order::getUserId)
     .toList(OrderStat.class);
 
-PageResult<UserRow> page = db.queryable(User.class)
+PageResult<UserRow> page = LightQuery.queryable(User.class)
     .orderByAsc(User::getId)
     .toPageResult(1, 20, UserRow.class);
 ```
@@ -523,9 +522,9 @@ PageResult<UserRow> page = db.queryable(User.class)
 
 ```java
 // 首页
-List<User> page1 = db.queryable(User.class).orderByAsc(User::getId).limit(20).toList();
+List<User> page1 = LightQuery.queryable(User.class).orderByAsc(User::getId).limit(20).toList();
 // 下一页：以上一页最后一行的排序列值作为游标（不再使用 offset）
-List<User> page2 = db.queryable(User.class).orderByAsc(User::getId).seekAfter(lastId).limit(20).toList();
+List<User> page2 = LightQuery.queryable(User.class).orderByAsc(User::getId).seekAfter(lastId).limit(20).toList();
 ```
 
 契约（测试固化，见 T18）：
