@@ -69,7 +69,7 @@ class DialectShapeTest {
     void sqlServerEscapesLikeAndSupportsSequences() {
         String sql = h2.db.dialect(new SqlServerDialect())
                 .queryable(User.class)
-                .strCol(User::getName).like("frank")
+                .col(User::getName).like("frank")
                 .toSql();
         assertTrue(sql.contains("ESCAPE '\\'"), sql);
         assertEquals("SELECT NEXT VALUE FOR [invoice_seq]",

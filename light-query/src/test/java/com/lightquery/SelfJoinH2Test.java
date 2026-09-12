@@ -142,8 +142,8 @@ class SelfJoinH2Test {
         List<Tuple> rows = db.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
-                .cmpCol(staff.col(Employee::getSalary)).gt(new java.math.BigDecimal("11000"))
-                .cmpCol(manager.col(Employee::getSalary)).gt(new java.math.BigDecimal("15000"))
+                .col(staff.col(Employee::getSalary)).gt(new java.math.BigDecimal("11000"))
+                .col(manager.col(Employee::getSalary)).gt(new java.math.BigDecimal("15000"))
                 .select(staff.col(Employee::getName))
                 .toTupleList();
         assertEquals(1, rows.size());

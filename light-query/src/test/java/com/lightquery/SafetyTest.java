@@ -80,7 +80,7 @@ class SafetyTest {
     void likeWildcardsInPayloadCannotWidenPattern() {
         String payload = "100%_match";
         h2.db.insert(h2.user(payload, User.Status.ACTIVE, 2, null, null, 0));
-        assertEquals(1, h2.db.queryable(User.class).strCol(User::getName).like("100%_match").count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getName).like("100%_match").count());
     }
 
     @Test

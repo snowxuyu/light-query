@@ -42,19 +42,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking: conditions are now strongly typed.** `Queryable` / `Where` /
   `JoinOn` / `Updatable` / `Deletable` no longer expose bare two-argument
   conditions (`.eq(col, value)`, `.gt(col, value)`, `.like(col, s)`,
-  `on.eq(colA, colB)`, `.set(col, v)`, ...). Pick a layered entry first —
-  the property type is checked at compile time:
-  - `col(...)`: equality family (`eq/ne/in/notIn/isNull/isNotNull`,
-    same-type `eqColumn/neColumn`, sub-queries);
-  - `cmpCol(...)`: only `Comparable` properties; adds
-    `gt/ge/lt/le/between/notBetween`;
-  - `strCol(...)`: only `String` properties; adds
-    `like/notLike/startsWith/endsWith`;
-  - `numCol(...)`: only `Number` properties; scalar terminals
-    `sum/avg/max/min` require `Number` properties too;
-  - `Updatable` mirrors the layers (`UpdatableColumn` family) with
-    `set/setNull` on `col`, `setIncrement` only on `numCol`;
-    `set(...)` on a joined-table column still fails fast at runtime.
+  `on.eq(colA, colB)`, `.set(col, v)`, ...). Call `col(...)` once to get a
+  typed handle — the property value type is pinned at creation, so every
+  condition built from it is checked at compile time: equality family
+  (`eq/ne/in/notIn/isNull/isNotNull`, same-type `eqColumn/neColumn`,
+  sub-queries), range (`gt/ge/lt/le/between/notBetween` and same-type
+  column-to-column variants), text (`like/notLike/startsWith/endsWith`,
+  only meaningful on `String` columns), `set/setNull/setIncrement` on the
+  `Updatable` handle (`setIncrement` only meaningful on numeric columns).
+  Scalar terminals `sum/avg/max/min` require `Number` properties.
+  `set(...)` on a joined-table column still fails fast at runtime.
   Migration table lives in README ("条件"). Test matrix T21
   (`StrongTypingTest`, positive run + documented must-not-compile cases).
 - update join / delete join statement shape is now comma-style with ON

@@ -54,7 +54,7 @@ class JoinSubqueryH2Test {
     void conditionsCanReferenceJoinedEntities() {
         List<User> rows = h2.db.queryable(User.class)
                 .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
-                .cmpCol(Order::getAmount).ge(new BigDecimal("100"))
+                .col(Order::getAmount).ge(new BigDecimal("100"))
                 .toList();
         assertEquals(1, rows.size());
         assertEquals("withOrders", rows.get(0).getName());
@@ -64,8 +64,8 @@ class JoinSubqueryH2Test {
     void multipleConditionsJoinEveryTable() {
         List<User> rows = h2.db.queryable(User.class)
                 .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
-                .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
-                .cmpCol(Order::getAmount).ge(new BigDecimal("100"))
+                .col(Order::getAmount).gt(new BigDecimal("100"))
+                .col(Order::getAmount).ge(new BigDecimal("100"))
                 .toList();
         assertEquals(1, rows.size());
     }
@@ -84,7 +84,7 @@ class JoinSubqueryH2Test {
         List<Tuple> rows = h2.db.queryable(User.class)
                 .innerJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .select(User::getName).select(Order::getAmount)
-                .cmpCol(Order::getAmount).ge(new BigDecimal("100"))
+                .col(Order::getAmount).ge(new BigDecimal("100"))
                 .toTupleList();
         assertEquals(1, rows.size());
         assertEquals("withOrders", rows.get(0).get("user_name"));
@@ -114,7 +114,7 @@ class JoinSubqueryH2Test {
         List<User> rows = h2.db.queryable(User.class)
                 .whereExists(h2.db.queryable(Order.class)
                         .col(Order::getUserId).eqColumn(User::getId)
-                        .cmpCol(Order::getAmount).ge(new BigDecimal("100")))
+                        .col(Order::getAmount).ge(new BigDecimal("100")))
                 .toList();
         assertEquals(1, rows.size());
         assertTrue(rows.get(0).getName().equals("withOrders"));

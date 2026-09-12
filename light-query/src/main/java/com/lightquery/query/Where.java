@@ -41,55 +41,19 @@ public final class Where<T> {
 
     /**
      * Starts a strongly-typed condition on a property — the value type of
-     * the property lambda drives the condition, e.g.
-     * {@code w.col(User::getAge).ge(18)}. The property may belong to any
-     * table in scope (root or joined).
+     * the property lambda drives every condition built from the returned
+     * handle, e.g. {@code w.col(User::getAge).ge(18)}. The property may
+     * belong to any table in scope (root or joined).
      */
     public <C, V> TypedColumn<Where<T>, V> col(SFunction<C, V> col) {
         ColumnResolver.Resolved resolved = resolver.resolve(col);
         return new TypedColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
     }
 
-    /** Range condition on a {@link Comparable} property. */
-    public <C, V extends Comparable<V>> ComparableColumn<Where<T>, V> cmpCol(SFunction<C, V> col) {
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new ComparableColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Text-match condition on a {@code String} property. */
-    public <C> StringColumn<Where<T>> strCol(SFunction<C, String> col) {
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new StringColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Numeric condition on a {@link Number} property. */
-    public <C, V extends Number & Comparable<V>> NumberColumn<Where<T>, V> numCol(SFunction<C, V> col) {
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new NumberColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
     /** Strongly-typed condition on a self-join occurrence column. */
     public <V> TypedColumn<Where<T>, V> col(TableColumn<?, V> column) {
         ColumnResolver.Resolved resolved = resolver.resolve(column);
         return new TypedColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Range condition on a self-join occurrence column of comparable type. */
-    public <V extends Comparable<V>> ComparableColumn<Where<T>, V> cmpCol(TableColumn<?, V> column) {
-        ColumnResolver.Resolved resolved = resolver.resolve(column);
-        return new ComparableColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Text-match condition on a self-join occurrence column of string type. */
-    public StringColumn<Where<T>> strCol(TableColumn<?, String> column) {
-        ColumnResolver.Resolved resolved = resolver.resolve(column);
-        return new StringColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Numeric condition on a self-join occurrence column of numeric type. */
-    public <V extends Number & Comparable<V>> NumberColumn<Where<T>, V> numCol(TableColumn<?, V> column) {
-        ColumnResolver.Resolved resolved = resolver.resolve(column);
-        return new NumberColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
     }
 
     // ------------------------------------------------------------------ aggregate comparisons (HAVING)

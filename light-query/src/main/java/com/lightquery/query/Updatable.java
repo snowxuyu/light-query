@@ -110,43 +110,13 @@ public final class Updatable<T> {
     /**
      * Starts a strongly-typed column handle: carries the SET family (updated
      * entity only — {@code set} on a joined column fails at runtime) plus the
-     * condition family (any joined table), all checked against the property
-     * type at compile time.
+     * whole condition family (any joined table), all checked against the
+     * property type at compile time.
      */
     public <C, V> UpdatableColumn<T, V> col(SFunction<C, V> col) {
         ensureOpen();
         ColumnResolver.Resolved resolved = resolver.resolve(col);
         return new UpdatableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
-                resolver, isRootColumn(col));
-    }
-
-    /**
-     * Starts a range condition handle; only {@link Comparable} properties
-     * compile here. SET methods remain available on updated-entity columns.
-     */
-    public <C, V extends Comparable<V>> UpdatableComparableColumn<T, V> cmpCol(SFunction<C, V> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new UpdatableComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
-                resolver, isRootColumn(col));
-    }
-
-    /** Starts a text-match handle for a {@code String} property. */
-    public <C> UpdatableStringColumn<T> strCol(SFunction<C, String> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new UpdatableStringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
-                resolver, isRootColumn(col));
-    }
-
-    /**
-     * Starts a numeric handle: carries {@code setIncrement} (updated entity
-     * only) plus the comparison family.
-     */
-    public <C, V extends Number & Comparable<V>> UpdatableNumberColumn<T, V> numCol(SFunction<C, V> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new UpdatableNumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
                 resolver, isRootColumn(col));
     }
 

@@ -44,7 +44,7 @@ mvn test          # 仅测试
 
 - 条件入口签名是 `<C, V> col(SFunction<C, V> col)` 这类泛型方法——
   `SFunction<?, ?>` 通配目标会让方法引用编译失败（javac 实验已验证）。
-  分层入口（col/cmpCol/strCol/numCol）同样遵循此约束。
+  唯一的 `col(...)` 列柄入口同样遵循此约束。
 - 标量子查询独立命名 `eqSubQuery/neSubQuery/...`——避免与
   `eq(col, null)→IS NULL` 的重载歧义。
 - `and/or(consumer)` 为 MyBatis-Plus 语义：控制分组的外连接符，

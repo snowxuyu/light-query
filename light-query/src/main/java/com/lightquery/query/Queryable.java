@@ -98,9 +98,9 @@ public final class Queryable<T> {
 
     /**
      * Starts a strongly-typed condition on a property — the value type of
-     * the property lambda drives the condition, e.g.
-     * {@code .col(User::getAge).ge(18)}. The property may belong to any
-     * table in scope (root or joined).
+     * the property lambda drives every condition built from the returned
+     * handle, e.g. {@code .col(User::getAge).ge(18)}. The property may belong
+     * to any table in scope (root or joined).
      */
     public <C, V> TypedColumn<Queryable<T>, V> col(SFunction<C, V> col) {
         ensureOpen();
@@ -108,63 +108,11 @@ public final class Queryable<T> {
         return new TypedColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    /**
-     * Starts a range condition on a {@link Comparable} property, e.g.
-     * {@code .cmpCol(User::getAge).ge(18)}. Non-comparable properties do not
-     * compile here — use {@link #col(SFunction)} for equality.
-     */
-    public <C, V extends Comparable<V>> ComparableColumn<Queryable<T>, V> cmpCol(SFunction<C, V> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolve(col);
-        return new ComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
-    /**
-     * Starts a text-match condition on a {@code String} property, e.g.
-     * {@code .strCol(User::getName).like("frank")}.
-     */
-    public <C> StringColumn<Queryable<T>> strCol(SFunction<C, String> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolve(col);
-        return new StringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
-    /**
-     * Starts a numeric condition on a {@link Number} property, e.g.
-     * {@code .numCol(Order::getAmount).gt(new BigDecimal("100"))}.
-     */
-    public <C, V extends Number & Comparable<V>> NumberColumn<Queryable<T>, V> numCol(SFunction<C, V> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolve(col);
-        return new NumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
     /** Strongly-typed condition on a self-join occurrence column. */
     public <V> TypedColumn<Queryable<T>, V> col(TableColumn<?, V> column) {
         ensureOpen();
         ColumnResolver.Resolved resolved = resolve(column);
         return new TypedColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
-    /** Range condition on a self-join occurrence column of comparable type. */
-    public <V extends Comparable<V>> ComparableColumn<Queryable<T>, V> cmpCol(TableColumn<?, V> column) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolve(column);
-        return new ComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
-    /** Text-match condition on a self-join occurrence column of string type. */
-    public StringColumn<Queryable<T>> strCol(TableColumn<?, String> column) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolve(column);
-        return new StringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
-    /** Numeric condition on a self-join occurrence column of numeric type. */
-    public <V extends Number & Comparable<V>> NumberColumn<Queryable<T>, V> numCol(TableColumn<?, V> column) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolve(column);
-        return new NumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
     /** Adds a parenthesised AND group. */

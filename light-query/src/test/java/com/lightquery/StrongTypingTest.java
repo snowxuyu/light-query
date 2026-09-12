@@ -15,25 +15,29 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Strong-typing smoke coverage: every layered entry ({@code col / cmpCol /
- * strCol / numCol}) compiles against its intended property types and executes
- * correctly on H2.
+ * Strong-typing smoke coverage: the single {@code col(...)} handle pins the
+ * property value type at creation, so every condition built from it is
+ * checked at compile time and executes correctly on H2.
  *
  * <p>Negative cases are intentionally documentation-only (they must NOT
  * compile — verified by hand during development):
  * <pre>
- * // expect: cannot find symbol — like() is not on the base/Comparable layers
- * db.queryable(User.class).col(User::getAge).like("x");
- * db.queryable(User.class).cmpCol(User::getAge).like("x");
- * // expect: incompatible types — gt() needs the property type
- * db.queryable(User.class).strCol(User::getName).gt(5);
- * // expect: incompatible types — setIncrement() lives on numCol only
- * db.updatable(User.class).col(User::getAge).setIncrement(1);
+ * // expect: incompatible types — V is Integer, pinned by User::getAge
+ * db.queryable(User.class).col(User::getAge).eq("abc");
+ * // expect: incompatible types — V is String, pinned by User::getName
+ * db.queryable(User.class).col(User::getName).gt(5);
+ * // expect: incompatible types — set() needs the property type
+ * db.updatable(User.class).col(User::getStatus).set(42);
  * // expect: incompatible types — sum() needs a Number property
  * db.queryable(User.class).sum(User::getName);
  * // expect: no suitable method — JoinOn wildcards were removed
  * db.queryable(User.class).innerJoin(Order.class, on -> on.eq(User::getId, Order::getUserId));
  * </pre>
+ *
+ * <p>Deliberately NOT compile-checked: {@code like} / {@code setIncrement}
+ * on a wrong-typed column (e.g. {@code col(User::getAge).like("x")}) compiles
+ * but is only meaningful on String / numeric columns — the mismatch surfaces
+ * at the database, documented on each method.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class StrongTypingTest {
@@ -52,28 +56,24 @@ class StrongTypingTest {
     }
 
     @Test
-    void baseEqualityLayer() {
+    void equalityFamily() {
         assertEquals(1, h2.db.queryable(User.class).col(User::getStatus).eq(User.Status.ACTIVE).count());
         assertEquals(2, h2.db.queryable(User.class).col(User::getName).in("frank", "alice").count());
     }
 
     @Test
-    void comparableLayer() {
-        assertEquals(1, h2.db.queryable(User.class).cmpCol(User::getAge).ge(30).count());
-        assertEquals(2, h2.db.queryable(User.class).cmpCol(User::getAge).between(20, 35).count());
+    void rangeAndTextFamily() {
+        assertEquals(1, h2.db.queryable(User.class).col(User::getAge).ge(30).count());
+        assertEquals(2, h2.db.queryable(User.class).col(User::getAge).between(20, 35).count());
         assertEquals(1, h2.db.queryable(User.class)
-                .cmpCol(User::getBalance).gt(new BigDecimal("150")).count());
+                .col(User::getBalance).gt(new BigDecimal("150")).count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getName).like("frank").count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getName).startsWith("ali").count());
+        assertEquals(1, h2.db.queryable(User.class).col(User::getName).endsWith("k").count());
         // column-to-column via the typed handle
         assertEquals(2, h2.db.queryable(User.class)
-                .leftJoin(Order.class, on -> on.cmpCol(User::getId).eqColumn(Order::getUserId))
-                .cmpCol(User::getAge).ge(30).count());
-    }
-
-    @Test
-    void stringLayer() {
-        assertEquals(1, h2.db.queryable(User.class).strCol(User::getName).like("frank").count());
-        assertEquals(1, h2.db.queryable(User.class).strCol(User::getName).startsWith("ali").count());
-        assertEquals(1, h2.db.queryable(User.class).strCol(User::getName).endsWith("k").count());
+                .leftJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+                .col(User::getAge).ge(30).count());
     }
 
     @Test
@@ -89,14 +89,14 @@ class StrongTypingTest {
     }
 
     @Test
-    void updatableLayers() {
+    void updatableSingleHandle() {
         // read-then-verify on alice keeps the change relative: every other
         // test stays green no matter which order JUnit runs the methods in
-        User alice = h2.db.queryable(User.class).strCol(User::getName).eq("alice").firstOrNull();
+        User alice = h2.db.queryable(User.class).col(User::getName).eq("alice").firstOrNull();
         int before = alice.getAge();
         int rows = h2.db.updatable(User.class)
-                .numCol(User::getAge).setIncrement(1)
-                .strCol(User::getName).eq("alice")
+                .col(User::getAge).setIncrement(1)
+                .col(User::getName).eq("alice")
                 .execute();
         assertEquals(1, rows);
         assertEquals(before + 1, h2.db.queryById(User.class, alice.getId()).getAge());

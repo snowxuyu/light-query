@@ -277,18 +277,14 @@ public final class LightQuerySession implements QueryExecutor {     // 绑定一
 
 ```java
 public final class Queryable<T> {
-    // ── 条件：先选分层入口（值类型由属性 lambda 在编译期锁定），再在返回的列柄上写条件；
-    // 每层方法都返回 builder，链式继续。旧的裸 .eq(col, value) 双参直调已移除，见强类型迁移表（README“条件”）。
+    // ── 条件：调 col(...) 拿列柄（值类型由属性 lambda 在编译期锁定），再在柄上写条件；
+    // 每个方法都返回 builder，链式继续。旧的裸 .eq(col, value) 双参直调已移除，见强类型迁移表（README“条件”）。
     <C, V> TypedColumn<Queryable<T>, V> col(SFunction<C, V> col);
         // 相等族：eq/ne（null → IS NULL / IS NOT NULL）、in/notIn（空集合 → 1=0 / 1=1）、
-        // isNull/isNotNull、eqColumn/neColumn（同值类型列对列）、in/notIn/比较子查询
-    <C, V extends Comparable<V>> ComparableColumn<Queryable<T>, V> cmpCol(SFunction<C, V> col);
-        // 相等族 + gt/ge/lt/le/between/notBetween
-    <C> StringColumn<Queryable<T>> strCol(SFunction<C, String> col);
-        // 相等族 + like/notLike（两侧加 %，%_\ 自动转义）/startsWith/endsWith
-    <C, V extends Number & Comparable<V>> NumberColumn<Queryable<T>, V> numCol(SFunction<C, V> col);
-        // 比较族（数值列）；聚合终端 sum/avg/max/min 要求 Number 属性
-    // TableColumn（自连接 occurrence）同理：col/cmpCol/strCol/numCol(TableColumn<?, V>)
+        // isNull/isNotNull、同值类型列对列 eqColumn/neColumn、in/notIn/标量子查询；
+        // 比较族：gt/ge/lt/le/between/notBetween、同值类型 gtColumn/geColumn/ltColumn/leColumn；
+        // 文本：like/notLike（两侧加 %，%_\ 自动转义）/startsWith/endsWith（仅 String 列有意义）
+    // TableColumn（自连接 occurrence）：col(TableColumn<?, V>)（同上，单柄承载全部条件）
 
     // ── 逻辑分组（嵌套 Where 的连接词默认 AND，组内 .or() 改变相邻连接）
     Queryable<T> and(Consumer<Where<T>> group);   // → AND ( … )
@@ -346,7 +342,7 @@ public final class Queryable<T> {
 
 ```java
 public final class JoinOn<A, B> {
-    // 列对列（主用法）：先 col/cmpCol/strCol/numCol 选一侧，再 .eqColumn/neColumn/...(另一侧)——
+    // 列对列（主用法）：col(...) 选一侧，再 .eqColumn/neColumn/...(另一侧)——
     // 两侧值类型一致才编译通过；旧的裸 eq(colA, colB) 通配符重载已移除（曾允许跨类型比较）。
     // 自连接 occurrence 用 TableColumn 重载：eqColumn/neColumn/gtColumn/geColumn/ltColumn/leColumn(colA, colB)。
     JoinOn<A, B> eq/ne/gt/ge/lt/le(SFunction<C, V> col, V value);  // 常量条件（值类型锁定）
@@ -547,13 +543,13 @@ List<User> page2 = db.queryable(User.class).orderByAsc(User::getId).seekAfter(la
 int rows = db.updatable(User.class)
     .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
     .col(User::getStatus).set(Status.FROZEN)
-    .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
+    .col(Order::getAmount).gt(new BigDecimal("100"))
     .execute();
 
 // delete join（@LogicDelete 实体自动转 UPDATE join；physical() 强转物理 DELETE）
 db.deletable(User.class)
   .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
-  .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
+  .col(Order::getAmount).gt(new BigDecimal("100"))
   .execute();
 ```
 
@@ -709,7 +705,7 @@ unchecked）——不新增自定义异常类型。
 | T18 | SeekPaginationH2Test | seek 分页：单列/多列混合方向遍历不重不漏、与用户条件 AND、无 orderBy / 值个数不符 / null 值报错 |
 | T19 | DialectShapeTest | Oracle/SQLServer 方言：分页子句、引号、无 ORDER BY 时补中性排序、LIKE ESCAPE、SEQUENCE 语法、JDBC URL 探测 |
 | T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照（逗号风格 FROM 列表，ON 并入 WHERE）、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错 |
-| T21 | StrongTypingTest | 强类型分层：col/cmpCol/strCol/numCol 四层在 H2 的正例执行（相等/比较/文本/数值、join 列对列、聚合终端、updatable 各层、JoinOn 常量族）；断言与执行顺序无关；编不过的负例以文档注释固化（见类头 javadoc） |
+| T21 | StrongTypingTest | 强类型单柄：`col(...)` 列柄在创建时锁定值类型，其上全部条件（相等/比较/文本/列对列、聚合终端、updatable 写入、JoinOn 常量族）在 H2 正例执行；断言与执行顺序无关；编不过的负例以文档注释固化（见类头 javadoc）；`like/setIncrement` 在错误类型列上的误用仅运行时由数据库暴露（见方法 javadoc） |
 
 覆盖率门禁：JaCoCo core 指令覆盖 ≥ 85%，`sqlgen`/`meta` 包 ≥ 90%。
 

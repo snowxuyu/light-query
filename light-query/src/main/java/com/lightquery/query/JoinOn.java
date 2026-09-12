@@ -30,7 +30,7 @@ public final class JoinOn<A, B> {
     }
 
     // --------------------------------------------- column-to-column via typed handles
-    // Use col/cmpCol/strCol(...).eqColumn(...) so both sides share the value type.
+    // Use col(...).eqColumn(...) so both sides share the value type.
     // (The old eq(colA, colB) wildcard overloads were removed: they allowed
     // comparing columns of different types.)
 
@@ -94,24 +94,6 @@ public final class JoinOn<A, B> {
     public <C, V> TypedColumn<JoinOn<A, B>, V> col(SFunction<C, V> col) {
         ColumnResolver.Resolved resolved = resolver.resolve(col);
         return new TypedColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Range ON-condition on a {@link Comparable} property. */
-    public <C, V extends Comparable<V>> ComparableColumn<JoinOn<A, B>, V> cmpCol(SFunction<C, V> col) {
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new ComparableColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Text-match ON-condition on a {@code String} property. */
-    public <C> StringColumn<JoinOn<A, B>> strCol(SFunction<C, String> col) {
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new StringColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
-    }
-
-    /** Numeric ON-condition on a {@link Number} property. */
-    public <C, V extends Number & Comparable<V>> NumberColumn<JoinOn<A, B>, V> numCol(SFunction<C, V> col) {
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new NumberColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
     }
 
     /** Switches the connector of the next added condition to OR. */

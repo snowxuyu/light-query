@@ -1,7 +1,8 @@
 # Strong Typing API Design — light-query
 
 Date: 2026-09-11
-Status: approved (sections 1-4 confirmed by user)
+Status: SUPERSEDED in part — the layered `col/cmpCol/strCol/numCol` entries (§2–§3) were replaced per user decision (2026-09-12) by a single `col(...)` handle carrying all conditions (`col(User::getAge).gt(18)`); the soundness analysis (§1, LUB hole) and the full-chain tightening (§4: having/aggregations/seekAfter/pk) still stand.
+Status was: approved (sections 1-4 confirmed by user)
 Goals: 梳理整体项目 + 封装 API 强类型校验 + 生产级可用、没有 bug
 Constraints: 允许破坏性变更；编译期严格分层卡死；全链路收紧；行为零变更（SQL 渲染不动）
 

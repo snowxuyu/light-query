@@ -53,8 +53,8 @@ class SqlSnapshotTest {
         // inside a group the default connector is AND and .or() switches the next one
         String sql = db.queryable(User.class)
                 .col(User::getStatus).eq(User.Status.ACTIVE)
-                .or(w -> w.strCol(User::getName).like("f").cmpCol(User::getAge).ge(18))
-                .and(w -> w.strCol(User::getName).like("x").or().cmpCol(User::getAge).ge(21))
+                .or(w -> w.col(User::getName).like("f").col(User::getAge).ge(18))
+                .and(w -> w.col(User::getName).like("x").or().col(User::getAge).ge(21))
                 .toSql();
         assertEquals("SELECT * FROM `t_user` WHERE `status` = ?"
                 + " OR (`user_name` LIKE ? AND `age` >= ?)"
@@ -125,7 +125,7 @@ class SqlSnapshotTest {
         String sql = db.queryable(User.class)
                 .leftJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(User::getStatus).eq(User.Status.ACTIVE)
-                .cmpCol(Order::getAmount).gt(new BigDecimal("100"))
+                .col(Order::getAmount).gt(new BigDecimal("100"))
                 .toSql();
         assertEquals("SELECT `t0`.`id`, `t0`.`user_name`, `t0`.`status`, `t0`.`age`,"
                 + " `t0`.`balance`, `t0`.`created_at`, `t0`.`remark`, `t0`.`deleted`"
@@ -140,7 +140,7 @@ class SqlSnapshotTest {
         String sql = db.queryable(User.class)
                 .col(User::getId).in(db.queryable(Order.class)
                         .select(Order::getUserId)
-                        .cmpCol(Order::getAmount).gt(new BigDecimal("100")))
+                        .col(Order::getAmount).gt(new BigDecimal("100")))
                 .toSql();
         assertEquals("SELECT * FROM `t_user` `t0`"
                 + " WHERE `t0`.`id` IN (SELECT `s1_0`.`user_id` FROM `t_order` `s1_0`"
@@ -153,7 +153,7 @@ class SqlSnapshotTest {
         String sql = db.queryable(User.class)
                 .whereExists(db.queryable(Order.class)
                         .col(Order::getUserId).eqColumn(User::getId)
-                        .cmpCol(Order::getAmount).ge(new BigDecimal("50")))
+                        .col(Order::getAmount).ge(new BigDecimal("50")))
                 .toSql();
         assertEquals("SELECT * FROM `t_user` `t0`"
                 + " WHERE EXISTS (SELECT * FROM `t_order` `s1_0`"
@@ -176,7 +176,7 @@ class SqlSnapshotTest {
     void postgresqlQuotingAndLikeEscape() {
         LightQuerySession pg = h2.db.dialect(new PostgreSqlDialect());
         String sql = pg.queryable(User.class)
-                .strCol(User::getName).like("a%b")
+                .col(User::getName).like("a%b")
                 .toSql();
         assertEquals("SELECT * FROM \"t_user\" WHERE \"user_name\" LIKE ? ESCAPE '\\'"
                 + " AND \"deleted\" = ? | params=[%a\\%b%, 0]", sql);

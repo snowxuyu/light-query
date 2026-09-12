@@ -39,21 +39,21 @@ class QueryH2Test {
     @Test
     void likeEscapesUserWildcards() {
         // the literal name "frank%like" must match exactly, not widen the pattern
-        List<User> rows = h2.db.queryable(User.class).strCol(User::getName).like("frank%").toList();
+        List<User> rows = h2.db.queryable(User.class).col(User::getName).like("frank%").toList();
         assertEquals(1, rows.size());
         assertEquals("frank%like", rows.get(0).getName());
     }
 
     @Test
     void startsWithAndEndsWith() {
-        assertEquals(2, h2.db.queryable(User.class).strCol(User::getName).startsWith("frank").count());
-        assertEquals(2, h2.db.queryable(User.class).strCol(User::getName).endsWith("e").count());
+        assertEquals(2, h2.db.queryable(User.class).col(User::getName).startsWith("frank").count());
+        assertEquals(2, h2.db.queryable(User.class).col(User::getName).endsWith("e").count());
     }
 
     @Test
     void inAndBetween() {
         assertEquals(2, h2.db.queryable(User.class).col(User::getName).in("frank", "alice").count());
-        assertEquals(2, h2.db.queryable(User.class).cmpCol(User::getAge).between(20, 35).count());
+        assertEquals(2, h2.db.queryable(User.class).col(User::getAge).between(20, 35).count());
     }
 
     @Test
@@ -67,7 +67,7 @@ class QueryH2Test {
         // status=ACTIVE AND (age < 18 OR balance >= 200)
         List<User> rows = h2.db.queryable(User.class)
                 .col(User::getStatus).eq(User.Status.ACTIVE)
-                .and(w -> w.cmpCol(User::getAge).lt(18).or().cmpCol(User::getBalance).ge(new BigDecimal("200")))
+                .and(w -> w.col(User::getAge).lt(18).or().col(User::getBalance).ge(new BigDecimal("200")))
                 .toList();
         assertEquals(2, rows.size());
     }

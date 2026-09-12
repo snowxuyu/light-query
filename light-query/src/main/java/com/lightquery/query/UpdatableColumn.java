@@ -8,6 +8,7 @@ import com.lightquery.query.model.Condition;
 import com.lightquery.query.model.ConditionGroup;
 import com.lightquery.query.model.Operator;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -24,10 +25,11 @@ import java.util.List;
  *     .execute();
  * }</pre>
  *
- * <p>Range comparisons live on {@link UpdatableComparableColumn} (via
- * {@code cmpCol(...)}), text matches on {@link UpdatableStringColumn} (via
- * {@code strCol(...)}), {@code setIncrement} on {@link UpdatableNumberColumn}
- * (via {@code numCol(...)}). Every method returns the owning {@link Updatable}
+ * <p>This single layer carries the SET family plus the whole condition
+ * family, both checked against the property type at compile time. Text
+ * matches and {@code setIncrement} are only meaningful on String / numeric
+ * columns — the framework renders them as written and leaves the type
+ * mismatch to the database. Every method returns the owning {@link Updatable}
  * so the chain continues with the next column or terminal.</p>
  *
  * @param <T> the updated entity type
@@ -91,7 +93,7 @@ public class UpdatableColumn<T, V> {
 
     @SafeVarargs
     public final Updatable<T> in(V... values) {
-        return in(java.util.Arrays.asList(values));
+        return in(Arrays.asList(values));
     }
 
     /** Excludes every value; an empty collection renders {@code 1 = 1}. */
@@ -102,7 +104,7 @@ public class UpdatableColumn<T, V> {
 
     @SafeVarargs
     public final Updatable<T> notIn(V... values) {
-        return notIn(java.util.Arrays.asList(values));
+        return notIn(Arrays.asList(values));
     }
 
     /** {@code col IS NULL}. */
@@ -123,6 +125,103 @@ public class UpdatableColumn<T, V> {
      */
     public <C> Updatable<T> eqColumn(SFunction<C, V> other) {
         group.add(Condition.ofColumns(ref, Operator.EQ, resolver.resolve(other).ref()));
+        return updatable;
+    }
+
+    /** {@code col > value}. */
+    public Updatable<T> gt(V value) {
+        return add(Operator.GT, value);
+    }
+
+    /** {@code col >= value}. */
+    public Updatable<T> ge(V value) {
+        return add(Operator.GE, value);
+    }
+
+    /** {@code col < value}. */
+    public Updatable<T> lt(V value) {
+        return add(Operator.LT, value);
+    }
+
+    /** {@code col <= value}. */
+    public Updatable<T> le(V value) {
+        return add(Operator.LE, value);
+    }
+
+    /** Inclusive range. */
+    public Updatable<T> between(V lo, V hi) {
+        group.add(Condition.of(ref, Operator.BETWEEN,
+                Arrays.asList(meta.toDbValue(lo), meta.toDbValue(hi))));
+        return updatable;
+    }
+
+    /** Excludes the inclusive range. */
+    public Updatable<T> notBetween(V lo, V hi) {
+        group.add(Condition.of(ref, Operator.NOT_BETWEEN,
+                Arrays.asList(meta.toDbValue(lo), meta.toDbValue(hi))));
+        return updatable;
+    }
+
+    /** Column-to-column {@code >} against another property of the same value type. */
+    public <C> Updatable<T> gtColumn(SFunction<C, V> other) {
+        group.add(Condition.ofColumns(ref, Operator.GT, resolver.resolve(other).ref()));
+        return updatable;
+    }
+
+    /** Column-to-column {@code >=} against another property of the same value type. */
+    public <C> Updatable<T> geColumn(SFunction<C, V> other) {
+        group.add(Condition.ofColumns(ref, Operator.GE, resolver.resolve(other).ref()));
+        return updatable;
+    }
+
+    /** Column-to-column {@code <} against another property of the same value type. */
+    public <C> Updatable<T> ltColumn(SFunction<C, V> other) {
+        group.add(Condition.ofColumns(ref, Operator.LT, resolver.resolve(other).ref()));
+        return updatable;
+    }
+
+    /** Column-to-column {@code <=} against another property of the same value type. */
+    public <C> Updatable<T> leColumn(SFunction<C, V> other) {
+        group.add(Condition.ofColumns(ref, Operator.LE, resolver.resolve(other).ref()));
+        return updatable;
+    }
+
+    /**
+     * Contains match with {@code \ % _} escaped, both sides wrapped in
+     * {@code %}. Only meaningful on String columns.
+     */
+    public Updatable<T> like(String contains) {
+        group.add(Condition.of(ref, Operator.LIKE,
+                Collections.singletonList(Escape.contains(contains))));
+        return updatable;
+    }
+
+    /** Negated contains match. Only meaningful on String columns. */
+    public Updatable<T> notLike(String contains) {
+        group.add(Condition.of(ref, Operator.NOT_LIKE,
+                Collections.singletonList(Escape.contains(contains))));
+        return updatable;
+    }
+
+    /** Right-side wildcard. Only meaningful on String columns. */
+    public Updatable<T> startsWith(String prefix) {
+        group.add(Condition.of(ref, Operator.LIKE,
+                Collections.singletonList(Escape.prefix(prefix))));
+        return updatable;
+    }
+
+    /** Left-side wildcard. Only meaningful on String columns. */
+    public Updatable<T> endsWith(String suffix) {
+        group.add(Condition.of(ref, Operator.LIKE,
+                Collections.singletonList(Escape.suffix(suffix))));
+        return updatable;
+    }
+
+    /** Numeric self-increment: {@code col = col + delta} (negative delta decrements). Only meaningful on numeric columns. */
+    public Updatable<T> setIncrement(long delta) {
+        requireSetAllowed();
+        requireNotPrimaryKey();
+        updatable.addIncrement(meta.getColumnName(), delta);
         return updatable;
     }
 

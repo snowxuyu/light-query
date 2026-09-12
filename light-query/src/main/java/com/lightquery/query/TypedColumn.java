@@ -23,11 +23,13 @@ import java.util.List;
  *     .col(User::getAge).eq("abc")              // ✗ does not compile
  * }</pre>
  *
- * <p>This base layer carries only the equality family. Range comparisons live
- * on {@link ComparableColumn} (via {@code cmpCol(...)}), text matches on
- * {@link StringColumn} (via {@code strCol(...)}), numeric markers on
- * {@link NumberColumn} (via {@code numCol(...)}). Every method returns the
- * owning builder, so the fluent chain continues as usual.</p>
+ * <p>This single layer carries the whole condition family; the value type
+ * {@code V} is fixed at creation so every method is checked at compile time
+ * (e.g. {@code col(User::getAge).eq("abc")} does not compile). Text matches
+ * ({@code like} et al.) and {@code setIncrement}-style renders are only
+ * meaningful on String / numeric columns — the framework renders them as
+ * written and leaves the type mismatch to the database. Every method returns
+ * the owning builder, so the fluent chain continues as usual.</p>
  *
  * @param <B> the builder this column was created from
  * @param <V> the value type of the property
@@ -155,6 +157,87 @@ public class TypedColumn<B, V> {
     /** Scalar sub-query comparison: {@code col <= (SELECT ...)}. */
     public B leSubQuery(Queryable<?> subQuery) {
         return subQueryCondition(Operator.LE, subQuery);
+    }
+
+    /** {@code col > value}. */
+    public B gt(V value) {
+        return add(Operator.GT, value);
+    }
+
+    /** {@code col >= value}. */
+    public B ge(V value) {
+        return add(Operator.GE, value);
+    }
+
+    /** {@code col < value}. */
+    public B lt(V value) {
+        return add(Operator.LT, value);
+    }
+
+    /** {@code col <= value}. */
+    public B le(V value) {
+        return add(Operator.LE, value);
+    }
+
+    /** Inclusive range. */
+    public B between(V lo, V hi) {
+        group.add(Condition.of(ref, Operator.BETWEEN,
+                Arrays.asList(meta.toDbValue(lo), meta.toDbValue(hi))));
+        return builder;
+    }
+
+    /** Excludes the inclusive range. */
+    public B notBetween(V lo, V hi) {
+        group.add(Condition.of(ref, Operator.NOT_BETWEEN,
+                Arrays.asList(meta.toDbValue(lo), meta.toDbValue(hi))));
+        return builder;
+    }
+
+    /** Column-to-column {@code >} against another property of the same value type. */
+    public <C> B gtColumn(SFunction<C, V> other) {
+        return compareColumn(other, Operator.GT);
+    }
+
+    /** Column-to-column {@code >=} against another property of the same value type. */
+    public <C> B geColumn(SFunction<C, V> other) {
+        return compareColumn(other, Operator.GE);
+    }
+
+    /** Column-to-column {@code <} against another property of the same value type. */
+    public <C> B ltColumn(SFunction<C, V> other) {
+        return compareColumn(other, Operator.LT);
+    }
+
+    /** Column-to-column {@code <=} against another property of the same value type. */
+    public <C> B leColumn(SFunction<C, V> other) {
+        return compareColumn(other, Operator.LE);
+    }
+
+    /**
+     * Contains match with {@code \ % _} escaped, both sides wrapped in
+     * {@code %}. Only meaningful on String columns.
+     */
+    public B like(String contains) {
+        group.add(Condition.of(ref, Operator.LIKE, Collections.singletonList(Escape.contains(contains))));
+        return builder;
+    }
+
+    /** Negated contains match. Only meaningful on String columns. */
+    public B notLike(String contains) {
+        group.add(Condition.of(ref, Operator.NOT_LIKE, Collections.singletonList(Escape.contains(contains))));
+        return builder;
+    }
+
+    /** Right-side wildcard. Only meaningful on String columns. */
+    public B startsWith(String prefix) {
+        group.add(Condition.of(ref, Operator.LIKE, Collections.singletonList(Escape.prefix(prefix))));
+        return builder;
+    }
+
+    /** Left-side wildcard. Only meaningful on String columns. */
+    public B endsWith(String suffix) {
+        group.add(Condition.of(ref, Operator.LIKE, Collections.singletonList(Escape.suffix(suffix))));
+        return builder;
     }
 
     protected B subQueryCondition(Operator operator, Queryable<?> subQuery) {

@@ -112,27 +112,6 @@ public final class Deletable<T> {
         return new TypedColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
     }
 
-    /** Range condition on a {@link Comparable} property. */
-    public <C, V extends Comparable<V>> ComparableColumn<Deletable<T>, V> cmpCol(SFunction<C, V> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new ComparableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
-    /** Text-match condition on a {@code String} property. */
-    public <C> StringColumn<Deletable<T>> strCol(SFunction<C, String> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new StringColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
-    /** Numeric condition on a {@link Number} property. */
-    public <C, V extends Number & Comparable<V>> NumberColumn<Deletable<T>, V> numCol(SFunction<C, V> col) {
-        ensureOpen();
-        ColumnResolver.Resolved resolved = resolver.resolve(col);
-        return new NumberColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
-    }
-
     /** Forces a physical DELETE even when the entity has a logic-delete column. */
     public Deletable<T> physical() {
         ensureOpen();

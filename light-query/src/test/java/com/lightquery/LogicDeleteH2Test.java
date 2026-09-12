@@ -64,9 +64,9 @@ class LogicDeleteH2Test {
     void deletableBecomesUpdateByDefault() {
         h2.db.insert(h2.user("bulk1", User.Status.FROZEN, 5, null, null, 0));
         h2.db.insert(h2.user("bulk2", User.Status.FROZEN, 6, null, null, 0));
-        int rows = h2.db.deletable(User.class).strCol(User::getName).startsWith("bulk").execute();
+        int rows = h2.db.deletable(User.class).col(User::getName).startsWith("bulk").execute();
         assertEquals(2, rows);
-        assertEquals(0, h2.db.queryable(User.class).strCol(User::getName).startsWith("bulk").count());
+        assertEquals(0, h2.db.queryable(User.class).col(User::getName).startsWith("bulk").count());
     }
 
     @Test
