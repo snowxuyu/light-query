@@ -3,7 +3,9 @@ package com.lightquery.meta;
 import com.lightquery.annotation.LogicDelete;
 import com.lightquery.exception.MappingException;
 
+import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
@@ -152,6 +154,12 @@ public final class EntityMeta {
             }
         }
 
+        AttributeConverter<Object, Object> converter = null;
+        Convert convertAnnotation = field.getAnnotation(Convert.class);
+        if (convertAnnotation != null) {
+            converter = instantiateConverter(entityClass, field, convertAnnotation.converter());
+        }
+
         ColumnMeta.EnumKind enumKind = ColumnMeta.EnumKind.NONE;
         if (field.getType().isEnum()) {
             Enumerated enumerated = field.getAnnotation(Enumerated.class);
@@ -165,7 +173,23 @@ public final class EntityMeta {
         return new ColumnMeta(field, columnName, primaryKey, keyGeneration, sequenceName,
                 optimisticLock, insertable, updatable, enumKind, logicDelete != null,
                 logicDelete != null ? logicDelete.normalValue() : 0,
-                logicDelete != null ? logicDelete.deletedValue() : 1);
+                logicDelete != null ? logicDelete.deletedValue() : 1, converter);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static AttributeConverter<Object, Object> instantiateConverter(
+            Class<?> entityClass, Field field, Class<? extends AttributeConverter<?, ?>> converterClass) {
+        if (converterClass == null) {
+            throw new MappingException(entityClass.getName() + "." + field.getName()
+                    + ": @Convert(converter=...) must specify a converter class");
+        }
+        try {
+            return (AttributeConverter<Object, Object>) converterClass.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new MappingException("Cannot instantiate converter " + converterClass.getName()
+                    + " for " + entityClass.getName() + "." + field.getName()
+                    + " — it needs a public no-arg constructor", e);
+        }
     }
 
     /**

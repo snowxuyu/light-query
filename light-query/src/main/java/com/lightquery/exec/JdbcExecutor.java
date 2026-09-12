@@ -32,7 +32,7 @@ public final class JdbcExecutor {
     }
 
     public static <T> List<T> query(ConnectionProvider provider, SqlFragment fragment, RowMapper<T> mapper) {
-        return withConnection(provider, connection -> {
+        return withConnection(fragment, provider, connection -> {
             try (PreparedStatement ps = connection.prepareStatement(fragment.sql())) {
                 bind(ps, fragment.params());
                 try (ResultSet rs = ps.executeQuery()) {
@@ -66,7 +66,7 @@ public final class JdbcExecutor {
 
     /** Executes INSERT/UPDATE/DELETE, returning affected rows. */
     public static int execute(ConnectionProvider provider, SqlFragment fragment) {
-        return withConnection(provider, connection -> {
+        return withConnection(fragment, provider, connection -> {
             try (PreparedStatement ps = connection.prepareStatement(fragment.sql())) {
                 bind(ps, fragment.params());
                 return ps.executeUpdate();
@@ -82,7 +82,7 @@ public final class JdbcExecutor {
      */
     public static void insert(ConnectionProvider provider, SqlFragment fragment,
                               Object entity, ColumnMeta generatedKey) {
-        withConnection(provider, connection -> {
+        withConnection(fragment, provider, connection -> {
             try (PreparedStatement ps = connection.prepareStatement(fragment.sql(),
                     Statement.RETURN_GENERATED_KEYS)) {
                 bind(ps, fragment.params());
@@ -100,7 +100,7 @@ public final class JdbcExecutor {
     /** Executes a JDBC batch INSERT for same-shaped parameter rows. */
     public static int[] insertBatch(ConnectionProvider provider, SqlFragment fragment,
                                     List<List<Object>> paramRows) {
-        return withConnection(provider, connection -> {
+        return withConnection(fragment, provider, connection -> {
             try (PreparedStatement ps = connection.prepareStatement(fragment.sql())) {
                 for (List<Object> row : paramRows) {
                     bind(ps, row);
@@ -135,13 +135,28 @@ public final class JdbcExecutor {
         }
     }
 
-    private static <T> T withConnection(ConnectionProvider provider,
+    private static <T> T withConnection(SqlFragment fragment, ConnectionProvider provider,
                                         SqlWork<T> work) {
+        com.lightquery.SqlLogger logger = SqlLoggers.current();
+        long start = logger != null ? System.nanoTime() : 0;
+        if (logger != null) {
+            logger.beforeExecute(fragment.sql(), fragment.params());
+        }
         Connection connection = null;
         try {
             connection = provider.get();
-            return work.run(connection);
-        } catch (SQLException e) {
+            T result = work.run(connection);
+            if (logger != null) {
+                logger.afterExecute(fragment.sql(), (System.nanoTime() - start) / 1_000_000);
+            }
+            return result;
+        } catch (Exception e) {
+            if (logger != null) {
+                logger.onError(fragment.sql(), fragment.params(), e);
+            }
+            if (e instanceof RuntimeException re) {
+                throw re;
+            }
             throw new DataAccessException("connection acquisition", List.of(), e);
         } finally {
             if (connection != null) {

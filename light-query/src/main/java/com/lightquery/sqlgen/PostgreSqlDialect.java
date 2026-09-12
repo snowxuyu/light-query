@@ -1,5 +1,7 @@
 package com.lightquery.sqlgen;
 
+import java.util.List;
+
 /** PostgreSQL dialect (also usable for most ANSI-compatible databases). */
 public class PostgreSqlDialect implements Dialect {
 
@@ -47,5 +49,30 @@ public class PostgreSqlDialect implements Dialect {
     private String whereWithOn(JoinPieces p) {
         // ON conditions are pre-merged into the WHERE clause by SqlBuilder.
         return p.whereClause();
+    }
+
+    @Override
+    public boolean supportsUpsert() {
+        return true;
+    }
+
+    @Override
+    public String upsertSql(String table, List<String> columns, List<String> keyColumns, int valueRows) {
+        String quotedTable = quote(table);
+        String cols = String.join(", ", columns.stream().map(this::quote).toList());
+        String placeholders = "";
+        for (int r = 0; r < valueRows; r++) {
+            if (r > 0) placeholders += ", ";
+            placeholders += "(" + "?,".repeat(columns.size() - 1) + "?)";
+        }
+        String keys = String.join(", ", keyColumns.stream().map(this::quote).toList());
+        StringBuilder updates = new StringBuilder();
+        for (String col : columns) {
+            if (keyColumns.contains(col)) continue;
+            if (updates.length() > 0) updates.append(", ");
+            updates.append(quote(col)).append(" = EXCLUDED.").append(quote(col));
+        }
+        return "INSERT INTO " + quotedTable + " (" + cols + ") VALUES " + placeholders
+                + " ON CONFLICT (" + keys + ") DO UPDATE SET " + updates;
     }
 }

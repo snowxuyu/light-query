@@ -102,6 +102,14 @@ public final class LightQuerySession implements QueryExecutor {
         return EntityOperations.insertBatch(connections, dialect, entities);
     }
 
+    /**
+     * Inserts a collection in JDBC batches of {@code batchSize} rows each
+     * (0 = single batch); identity keys are not back-filled.
+     */
+    public <T> List<T> insertBatch(Collection<T> entities, int batchSize) {
+        return EntityOperations.insertBatch(connections, dialect, entities, batchSize);
+    }
+
     /** Full update by primary key — null columns are written as NULL. */
     public <T> void update(T entity) {
         EntityOperations.update(connections, dialect, entity);
@@ -156,6 +164,15 @@ public final class LightQuerySession implements QueryExecutor {
     /** Counts all rows of the entity's table (logic-delete filter applies). */
     public long count(Class<?> entityType) {
         return EntityOperations.count(connections, dialect, entityType);
+    }
+
+    /**
+     * Inserts the entity, or updates it if the primary key already exists.
+     * Supported by MySQL ({@code ON DUPLICATE KEY UPDATE}) and PostgreSQL
+     * ({@code ON CONFLICT DO UPDATE}); other dialects throw SqlBuildException.
+     */
+    public <T> void upsert(T entity) {
+        EntityOperations.upsert(connections, dialect, entity);
     }
 
     // ------------------------------------------------------------------ transactions

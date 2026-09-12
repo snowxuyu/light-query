@@ -55,6 +55,16 @@ public final class EntityOperations {
     /** Inserts many entities as one JDBC batch; identity keys are not back-filled. */
     public static <E> List<E> insertBatch(ConnectionProvider connections, Dialect dialect,
                                           Collection<E> entities) {
+        return insertBatch(connections, dialect, entities, 0);
+    }
+
+    /**
+     * Inserts many entities in JDBC batches of {@code batchSize} (0 = single
+     * batch); identity keys are not back-filled. SEQUENCE keys fetch one
+     * nextval per entity before the batch.
+     */
+    public static <E> List<E> insertBatch(ConnectionProvider connections, Dialect dialect,
+                                          Collection<E> entities, int batchSize) {
         if (entities.isEmpty()) {
             return List.of();
         }
@@ -79,7 +89,14 @@ public final class EntityOperations {
                     .toList());
         }
         SqlFragment fragment = SqlBuilder.insert(meta.getTableName(), names, List.of(), dialect);
-        JdbcExecutor.insertBatch(connections, fragment, rows);
+        if (batchSize > 0 && rows.size() > batchSize) {
+            for (int i = 0; i < rows.size(); i += batchSize) {
+                JdbcExecutor.insertBatch(connections, fragment,
+                        rows.subList(i, Math.min(i + batchSize, rows.size())));
+            }
+        } else {
+            JdbcExecutor.insertBatch(connections, fragment, rows);
+        }
         return List.copyOf(entities);
     }
 
@@ -119,6 +136,29 @@ public final class EntityOperations {
         QueryModel model = new QueryModel(entityType);
         addPkConditions(model, meta, validatedPkValues(meta, pkValues));
         return executeDelete(connections, dialect, model, meta, null, null);
+    }
+
+    /**
+     * Inserts the entity, or updates it if the primary key already exists.
+     * Uses dialect-specific upsert syntax (MySQL {@code ON DUPLICATE KEY
+     * UPDATE}, PG {@code ON CONFLICT DO UPDATE}).
+     */
+    public static <E> void upsert(ConnectionProvider connections, Dialect dialect, E entity) {
+        EntityMeta meta = EntityMetaCache.of(entity.getClass());
+        if (!dialect.supportsUpsert()) {
+            throw new SqlBuildException("The " + dialect.getClass().getSimpleName()
+                    + " dialect does not support upsert — use insert + update instead");
+        }
+        List<ColumnMeta> columns = meta.getInsertableColumns();
+        List<String> names = columns.stream().map(ColumnMeta::getColumnName).toList();
+        List<String> keyColumns = meta.getPrimaryKeys().stream()
+                .map(ColumnMeta::getColumnName).toList();
+        List<Object> values = columns.stream()
+                .map(c -> c.toDbValue(c.readValue(entity)))
+                .toList();
+        SqlFragment fragment = new SqlFragment(
+                dialect.upsertSql(meta.getTableName(), names, keyColumns, 1), values);
+        JdbcExecutor.execute(connections, fragment);
     }
 
     /** Selects one entity by primary key values (logic-delete filter applies). */

@@ -2,6 +2,8 @@ package com.lightquery.sqlgen;
 
 import com.lightquery.exception.SqlBuildException;
 
+import java.util.List;
+
 /**
  * Database dialect: identifier quoting, pagination syntax, LIKE escape
  * clause and sequence support. Every syntax difference between databases
@@ -51,6 +53,23 @@ public interface Dialect {
     default String updateJoinSql(JoinPieces pieces) {
         throw new SqlBuildException("The " + getClass().getSimpleName()
                 + " dialect does not support UPDATE with JOIN — filter with an IN subquery instead");
+    }
+
+    /** Whether the database supports upsert (INSERT ON DUPLICATE KEY / ON CONFLICT). */
+    default boolean supportsUpsert() {
+        return false;
+    }
+
+    /**
+     * Renders an upsert (INSERT ... ON DUPLICATE KEY / ON CONFLICT) statement.
+     * The key columns determine conflict detection; all non-key insertable
+     * columns are updated on conflict.
+     *
+     * @throws SqlBuildException when the database does not support upsert
+     */
+    default String upsertSql(String table, List<String> columns, List<String> keyColumns, int valueRows) {
+        throw new SqlBuildException("The " + getClass().getSimpleName()
+                + " dialect does not support upsert — use insert + update instead");
     }
 
     /**

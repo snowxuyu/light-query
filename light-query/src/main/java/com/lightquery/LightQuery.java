@@ -2,6 +2,7 @@ package com.lightquery;
 
 import com.lightquery.exec.ConnectionProvider;
 import com.lightquery.exec.FillListeners;
+import com.lightquery.exec.SqlLoggers;
 import com.lightquery.exception.LightQueryException;
 import com.lightquery.exception.SqlBuildException;
 import com.lightquery.query.Deletable;
@@ -225,6 +226,7 @@ public final class LightQuery {
             primaryDataSource = null;
             NAMED.clear();
             FillListeners.clear();
+            SqlLoggers.set(null);
         }
     }
 
@@ -240,6 +242,19 @@ public final class LightQuery {
     /** Removes the global {@link FillListener}. */
     public static void clearFillListener() {
         FillListeners.clear();
+    }
+
+    /**
+     * Registers the global {@link com.lightquery.SqlLogger} for SQL execution
+     * logging. Replaces any previously registered logger; {@code null} clears it.
+     */
+    public static void setSqlLogger(com.lightquery.SqlLogger logger) {
+        SqlLoggers.set(logger);
+    }
+
+    /** Removes the global {@link com.lightquery.SqlLogger}. */
+    public static void clearSqlLogger() {
+        SqlLoggers.set(null);
     }
 
     private static LightQuerySession requireSameDataSource(LightQuerySession session,
@@ -303,6 +318,11 @@ public final class LightQuery {
         return primary().insertBatch(entities);
     }
 
+    /** Same as {@link LightQuerySession#insertBatch(Collection, int)} on the primary datasource. */
+    public static <T> List<T> insertBatch(Collection<T> entities, int batchSize) {
+        return primary().insertBatch(entities, batchSize);
+    }
+
     /** Same as {@link LightQuerySession#update(Object)} on the primary datasource. */
     public static <T> void update(T entity) {
         primary().update(entity);
@@ -341,6 +361,11 @@ public final class LightQuery {
     /** Same as {@link LightQuerySession#count(Class)} on the primary datasource. */
     public static long count(Class<?> entityType) {
         return primary().count(entityType);
+    }
+
+    /** Same as {@link LightQuerySession#upsert(Object)} on the primary datasource. */
+    public static <T> void upsert(T entity) {
+        primary().upsert(entity);
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.lightquery.meta;
 
 import com.lightquery.exception.MappingException;
+import jakarta.persistence.AttributeConverter;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -40,11 +41,12 @@ public final class ColumnMeta {
     private final boolean logicDelete;
     private final int logicDeleteNormalValue;
     private final int logicDeleteDeletedValue;
+    private final AttributeConverter<Object, Object> converter;
 
     ColumnMeta(Field field, String columnName, boolean primaryKey, KeyGeneration keyGeneration,
                String sequenceName, boolean version, boolean insertable, boolean updatable,
                EnumKind enumKind, boolean logicDelete, int logicDeleteNormalValue,
-               int logicDeleteDeletedValue) {
+               int logicDeleteDeletedValue, AttributeConverter<Object, Object> converter) {
         this.field = field;
         this.propertyName = field.getName();
         this.columnName = columnName;
@@ -58,6 +60,7 @@ public final class ColumnMeta {
         this.logicDelete = logicDelete;
         this.logicDeleteNormalValue = logicDeleteNormalValue;
         this.logicDeleteDeletedValue = logicDeleteDeletedValue;
+        this.converter = converter;
         this.field.setAccessible(true);
     }
 
@@ -174,6 +177,9 @@ public final class ColumnMeta {
 
     /** Converts an entity property value into the value bound to JDBC. */
     public Object toDbValue(Object value) {
+        if (converter != null && value != null) {
+            value = converter.convertToDatabaseColumn(value);
+        }
         if (value == null || enumKind == EnumKind.NONE) {
             return value;
         }
@@ -183,6 +189,9 @@ public final class ColumnMeta {
 
     /** Converts a raw JDBC value into the property type. */
     public Object fromDbValue(Object value) {
+        if (converter != null) {
+            return converter.convertToEntityAttribute(value);
+        }
         if (value == null || enumKind == EnumKind.NONE) {
             return value;
         }
