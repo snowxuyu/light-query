@@ -325,6 +325,9 @@ public final class SqlBuilder {
         if (operator == Operator.EXISTS || operator == Operator.NOT_EXISTS) {
             return operator.text() + renderSubQuery(condition.getSubQuery(), scope, ctx, depth);
         }
+        if (operator == Operator.RAW) {
+            return renderRaw(condition, ctx);
+        }
         String target = renderSelectable(condition.getTarget(), scope, ctx, depth, false);
 
         return switch (operator) {
@@ -351,8 +354,24 @@ public final class SqlBuilder {
             }
             case LIKE, NOT_LIKE -> target + operator.text() + bindOne(ctx, condition.getValues().get(0))
                     + ctx.dialect().likeEscapeClause();
-            case EXISTS, NOT_EXISTS -> throw new IllegalStateException("handled above");
+            case EXISTS, NOT_EXISTS, RAW -> throw new IllegalStateException("handled above");
         };
+    }
+
+    /**
+     * Renders a {@code whereRaw} fragment verbatim (parenthesised, so it
+     * concatenates safely with AND/OR) and binds its params in {@code ?}
+     * order. The placeholder count must match the param count exactly.
+     */
+    private static String renderRaw(Condition condition, RenderContext ctx) {
+        String fragment = condition.getRawSql();
+        long marks = fragment.chars().filter(ch -> ch == '?').count();
+        if (marks != condition.getValues().size()) {
+            throw new SqlBuildException("whereRaw fragment has " + marks
+                    + " '?' placeholders but " + condition.getValues().size() + " params");
+        }
+        ctx.params().addAll(condition.getValues());
+        return "(" + fragment + ")";
     }
 
     private static String renderInRightSide(Condition condition, Scope scope, RenderContext ctx, int depth) {

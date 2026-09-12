@@ -9,7 +9,9 @@ public enum Operator {
     IN(" IN "), NOT_IN(" NOT IN "),
     IS_NULL(" IS NULL"), IS_NOT_NULL(" IS NOT NULL"),
     BETWEEN(" BETWEEN "), NOT_BETWEEN(" NOT BETWEEN "),
-    EXISTS("EXISTS "), NOT_EXISTS("NOT EXISTS ");
+    EXISTS("EXISTS "), NOT_EXISTS("NOT EXISTS "),
+    /** Raw SQL fragment with bound parameters — {@code text()} is unused, see {@code whereRaw}. */
+    RAW("");
 
     private final String text;
 

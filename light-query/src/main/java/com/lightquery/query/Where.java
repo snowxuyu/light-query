@@ -8,7 +8,9 @@ import com.lightquery.query.model.ConditionGroup;
 import com.lightquery.query.model.Expr;
 import com.lightquery.query.model.Operator;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -86,6 +88,30 @@ public final class Where<T> {
     /** HAVING: {@code aggregate <= value}. */
     public Where<T> le(Aggregate aggregate, Number value) {
         return addAggregate(aggregate, Operator.LE, value);
+    }
+
+
+    /**
+     * Applies {@code block} only when {@code condition} is true, e.g.
+     * {@code .or(w -> w.when(min != null, ww -> ww.col(User::getAge).ge(min)))}.
+     */
+    public Where<T> when(boolean condition, Consumer<Where<T>> block) {
+        if (condition) {
+            block.accept(this);
+        }
+        return this;
+    }
+
+    /**
+     * Appends a raw SQL fragment to the current group (escape hatch for dialect
+     * functions the typed API does not cover). The fragment is emitted
+     * verbatim inside parentheses; every {@code ?} binds the matching
+     * param — never concatenate values into the fragment. A
+     * placeholder/param count mismatch fails when the SQL is rendered.
+     */
+    public Where<T> whereRaw(String fragment, Object... params) {
+        group.add(Condition.raw(fragment, params == null ? List.of() : Arrays.asList(params)));
+        return this;
     }
 
     // ------------------------------------------------------------------ grouping & connectors

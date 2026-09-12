@@ -6,6 +6,10 @@ import com.lightquery.query.model.Condition;
 import com.lightquery.query.model.ConditionGroup;
 import com.lightquery.query.model.Operator;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+
 /**
  * ON-condition builder for joins. The primary form compares two columns of
  * the joined entities: {@code on -> on.col(User::getId).eq(Order::getUserId)}.
@@ -60,31 +64,6 @@ public final class JoinOn<A, B> {
         return addColumns(colA, Operator.LE, colB);
     }
 
-    /** Constant condition, e.g. {@code on.col(Order::getStatus).eq(1)} — strongly typed. */
-    public <C, V> JoinOn<A, B> eq(SFunction<C, V> col, V value) {
-        return addValue(col, Operator.EQ, value);
-    }
-
-    public <C, V> JoinOn<A, B> ne(SFunction<C, V> col, V value) {
-        return addValue(col, Operator.NE, value);
-    }
-
-    public <C, V> JoinOn<A, B> gt(SFunction<C, V> col, V value) {
-        return addValue(col, Operator.GT, value);
-    }
-
-    public <C, V> JoinOn<A, B> ge(SFunction<C, V> col, V value) {
-        return addValue(col, Operator.GE, value);
-    }
-
-    public <C, V> JoinOn<A, B> lt(SFunction<C, V> col, V value) {
-        return addValue(col, Operator.LT, value);
-    }
-
-    public <C, V> JoinOn<A, B> le(SFunction<C, V> col, V value) {
-        return addValue(col, Operator.LE, value);
-    }
-
     /**
      * Starts a strongly-typed condition on a property — both the constant
      * family ({@code on.col(User::getId).eq(5L)}) and the column-to-column
@@ -96,6 +75,27 @@ public final class JoinOn<A, B> {
         return new TypedColumn<>(this, group, resolved.ref(), resolved.meta(), resolver, onSubQuery);
     }
 
+
+    /** Applies {@code block} only when {@code condition} is true. */
+    public JoinOn<A, B> when(boolean condition, Consumer<JoinOn<A, B>> block) {
+        if (condition) {
+            block.accept(this);
+        }
+        return this;
+    }
+
+    /**
+     * Appends a raw SQL fragment to the ON clause (escape hatch for dialect
+     * functions the typed API does not cover). The fragment is emitted
+     * verbatim inside parentheses; every {@code ?} binds the matching
+     * param — never concatenate values into the fragment. A
+     * placeholder/param count mismatch fails when the SQL is rendered.
+     */
+    public JoinOn<A, B> whereRaw(String fragment, Object... params) {
+        group.add(Condition.raw(fragment, params == null ? List.of() : Arrays.asList(params)));
+        return this;
+    }
+
     /** Switches the connector of the next added condition to OR. */
     public JoinOn<A, B> or() {
         group.or();
@@ -104,12 +104,6 @@ public final class JoinOn<A, B> {
 
     private JoinOn<A, B> addColumns(TableColumn<?, ? > colA, Operator operator, TableColumn<?, ? > colB) {
         group.add(Condition.ofColumns(resolver.resolve(colA).ref(), operator, resolver.resolve(colB).ref()));
-        return this;
-    }
-
-    private JoinOn<A, B> addValue(SFunction<?, ?> col, Operator operator, Object value) {
-        ColumnResolver.Resolved r = resolver.resolve(col);
-        group.add(Condition.of(r.ref(), operator, java.util.List.of(r.meta().toDbValue(value))));
         return this;
     }
 

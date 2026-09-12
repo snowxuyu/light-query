@@ -6,6 +6,7 @@ import com.lightquery.lambda.LambdaUtils;
 import com.lightquery.TableColumn;
 import com.lightquery.lambda.SFunction;
 import com.lightquery.meta.ColumnMeta;
+import com.lightquery.meta.EntityMeta;
 import com.lightquery.query.model.ColumnRef;
 import com.lightquery.query.model.Condition;
 import com.lightquery.query.model.ConditionGroup;
@@ -17,6 +18,7 @@ import com.lightquery.query.model.TableRef;
 import com.lightquery.sqlgen.SqlBuilder;
 import com.lightquery.sqlgen.SqlFragment;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
@@ -118,6 +120,71 @@ public final class Updatable<T> {
         ColumnResolver.Resolved resolved = resolver.resolve(col);
         return new UpdatableColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(),
                 resolver, isRootColumn(col));
+    }
+
+
+    /**
+     * Bulk-sets every non-null updatable property of the given entity
+     * (selective semantics, like {@code updateSelective}, but with custom
+     * conditions instead of the primary key). Primary-key and
+     * {@code @Version} properties are skipped. Fails when nothing would be
+     * set; executing still requires a condition or {@link #allowFullTable()}.
+     */
+    public Updatable<T> setFrom(T entity) {
+        ensureOpen();
+        if (entity == null) {
+            throw new SqlBuildException("setFrom entity must not be null");
+        }
+        EntityMeta meta = model.getRoot().getMeta();
+        if (!meta.getEntityClass().isInstance(entity)) {
+            throw new SqlBuildException("setFrom expects a "
+                    + meta.getEntityClass().getSimpleName() + " but got "
+                    + entity.getClass().getSimpleName());
+        }
+        ColumnMeta version = meta.getVersionColumn();
+        int applied = 0;
+        for (ColumnMeta column : meta.getUpdatableColumns()) {
+            if (column == version) {
+                continue;
+            }
+            Object value = column.readValue(entity);
+            if (value == null) {
+                continue;
+            }
+            sets.add(SqlBuilder.SetClause.of(column.getColumnName(), column.toDbValue(value)));
+            applied++;
+        }
+        if (applied == 0) {
+            throw new SqlBuildException("setFrom(" + meta.getEntityClass().getSimpleName()
+                    + ") would set nothing — every updatable property is null");
+        }
+        return this;
+    }
+
+    /**
+     * Applies {@code block} only when {@code condition} is true — dynamic
+     * query building without breaking the chain, e.g.
+     * {@code .when(name != null, q -> q.col(User::getName).eq(name))}.
+     */
+    public Updatable<T> when(boolean condition, Consumer<Updatable<T>> block) {
+        ensureOpen();
+        if (condition) {
+            block.accept(this);
+        }
+        return this;
+    }
+
+    /**
+     * Appends a raw SQL fragment to the WHERE clause (escape hatch for dialect
+     * functions the typed API does not cover). The fragment is emitted
+     * verbatim inside parentheses; every {@code ?} binds the matching
+     * param — never concatenate values into the fragment. A
+     * placeholder/param count mismatch fails when the SQL is rendered.
+     */
+    public Updatable<T> whereRaw(String fragment, Object... params) {
+        ensureOpen();
+        model.getWhere().add(Condition.raw(fragment, params == null ? List.of() : Arrays.asList(params)));
+        return this;
     }
 
     /** Adds a parenthesised AND group. */

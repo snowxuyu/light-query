@@ -17,6 +17,7 @@ import com.lightquery.query.model.TableRef;
 import com.lightquery.sqlgen.SqlBuilder;
 import com.lightquery.sqlgen.SqlFragment;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
@@ -116,6 +117,33 @@ public final class Deletable<T> {
     public Deletable<T> physical() {
         ensureOpen();
         physical = true;
+        return this;
+    }
+
+
+    /**
+     * Applies {@code block} only when {@code condition} is true — dynamic
+     * query building without breaking the chain, e.g.
+     * {@code .when(name != null, q -> q.col(User::getName).eq(name))}.
+     */
+    public Deletable<T> when(boolean condition, Consumer<Deletable<T>> block) {
+        ensureOpen();
+        if (condition) {
+            block.accept(this);
+        }
+        return this;
+    }
+
+    /**
+     * Appends a raw SQL fragment to the WHERE clause (escape hatch for dialect
+     * functions the typed API does not cover). The fragment is emitted
+     * verbatim inside parentheses; every {@code ?} binds the matching
+     * param — never concatenate values into the fragment. A
+     * placeholder/param count mismatch fails when the SQL is rendered.
+     */
+    public Deletable<T> whereRaw(String fragment, Object... params) {
+        ensureOpen();
+        model.getWhere().add(Condition.raw(fragment, params == null ? List.of() : Arrays.asList(params)));
         return this;
     }
 

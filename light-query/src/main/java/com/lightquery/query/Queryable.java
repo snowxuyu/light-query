@@ -28,6 +28,7 @@ import com.lightquery.sqlgen.SqlFragment;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
@@ -113,6 +114,33 @@ public final class Queryable<T> {
         ensureOpen();
         ColumnResolver.Resolved resolved = resolve(column);
         return new TypedColumn<>(this, model.getWhere(), resolved.ref(), resolved.meta(), resolver, model::markUsesSubQueries);
+    }
+
+
+    /**
+     * Applies {@code block} only when {@code condition} is true — dynamic
+     * query building without breaking the chain, e.g.
+     * {@code .when(name != null, q -> q.col(User::getName).eq(name))}.
+     */
+    public Queryable<T> when(boolean condition, Consumer<Queryable<T>> block) {
+        ensureOpen();
+        if (condition) {
+            block.accept(this);
+        }
+        return this;
+    }
+
+    /**
+     * Appends a raw SQL fragment to the WHERE clause (escape hatch for dialect
+     * functions the typed API does not cover). The fragment is emitted
+     * verbatim inside parentheses; every {@code ?} binds the matching
+     * param — never concatenate values into the fragment. A
+     * placeholder/param count mismatch fails when the SQL is rendered.
+     */
+    public Queryable<T> whereRaw(String fragment, Object... params) {
+        ensureOpen();
+        model.getWhere().add(Condition.raw(fragment, params == null ? List.of() : Arrays.asList(params)));
+        return this;
     }
 
     /** Adds a parenthesised AND group. */
