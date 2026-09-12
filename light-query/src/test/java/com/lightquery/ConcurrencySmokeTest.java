@@ -25,7 +25,7 @@ class ConcurrencySmokeTest {
     @BeforeAll
     void setUp() {
         h2 = new TestDb("concurrent");
-        h2.db.insertBatch(List.of(
+        LightQuery.insertBatch(List.of(
                 h2.user("u1", User.Status.ACTIVE, 1, null, null, 0),
                 h2.user("u2", User.Status.FROZEN, 2, null, null, 0)));
     }
@@ -40,11 +40,11 @@ class ConcurrencySmokeTest {
             pool.submit(() -> {
                 try {
                     for (int j = 0; j < iterations; j++) {
-                        long total = h2.db.queryable(User.class).count();
+                        long total = LightQuery.queryable(User.class).count();
                         if (total < 2) {
                             throw new AssertionError("row went missing under concurrency");
                         }
-                        h2.db.insert(h2.user("t" + Thread.currentThread().getId() + "-" + j,
+                        LightQuery.insert(h2.user("t" + Thread.currentThread().getId() + "-" + j,
                                 User.Status.ACTIVE, 3, null, null, 0));
                         successes.incrementAndGet();
                     }

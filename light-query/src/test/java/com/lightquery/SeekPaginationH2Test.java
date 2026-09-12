@@ -25,7 +25,7 @@ class SeekPaginationH2Test {
     void setUp() {
         h2 = new TestDb("seek");
         for (int i = 1; i <= 7; i++) {
-            h2.db.insert(h2.user("seek" + i, i % 2 == 0 ? User.Status.FROZEN : User.Status.ACTIVE,
+            LightQuery.insert(h2.user("seek" + i, i % 2 == 0 ? User.Status.FROZEN : User.Status.ACTIVE,
                     20 + i, null, null, 0));
         }
     }
@@ -35,7 +35,7 @@ class SeekPaginationH2Test {
         List<Long> seen = new ArrayList<>();
         Long lastId = null;
         while (true) {
-            var query = h2.db.queryable(User.class).orderByAsc(User::getId).limit(3);
+            var query = LightQuery.queryable(User.class).orderByAsc(User::getId).limit(3);
             if (lastId != null) {
                 query.seekAfter(lastId);
             }
@@ -54,7 +54,7 @@ class SeekPaginationH2Test {
 
     @Test
     void keysetWalkMatchesFullOrderingForMixedDirections() {
-        List<String> expected = h2.db.queryable(User.class)
+        List<String> expected = LightQuery.queryable(User.class)
                 .orderByAsc(User::getStatus)
                 .orderByDesc(User::getAge)
                 .toList()
@@ -64,7 +64,7 @@ class SeekPaginationH2Test {
         User.Status lastStatus = null;
         Integer lastAge = null;
         while (seen.size() < 7) {
-            var query = h2.db.queryable(User.class)
+            var query = LightQuery.queryable(User.class)
                     .orderByAsc(User::getStatus)
                     .orderByDesc(User::getAge)
                     .limit(3);
@@ -90,7 +90,7 @@ class SeekPaginationH2Test {
         List<Long> seen = new ArrayList<>();
         Integer lastAge = null;
         while (true) {
-            var query = h2.db.queryable(User.class)
+            var query = LightQuery.queryable(User.class)
                     .col(User::getStatus).eq(User.Status.ACTIVE)
                     .orderByAsc(User::getAge)
                     .limit(2);
@@ -112,13 +112,13 @@ class SeekPaginationH2Test {
     @Test
     void seekWithoutOrderByIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class,
-                () -> h2.db.queryable(User.class).seekAfter(1L));
+                () -> LightQuery.queryable(User.class).seekAfter(1L));
         assertTrue(e.getMessage().contains("orderBy"), e.getMessage());
     }
 
     @Test
     void seekValueCountMismatchIsRejected() {
-        SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db.queryable(User.class)
+        SqlBuildException e = assertThrows(SqlBuildException.class, () -> LightQuery.queryable(User.class)
                 .orderByAsc(User::getId)
                 .seekAfter(1L, 2L));
         assertTrue(e.getMessage().contains("expects 1 value(s)"), e.getMessage());
@@ -126,7 +126,7 @@ class SeekPaginationH2Test {
 
     @Test
     void seekNullValueIsRejected() {
-        SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db.queryable(User.class)
+        SqlBuildException e = assertThrows(SqlBuildException.class, () -> LightQuery.queryable(User.class)
                 .orderByAsc(User::getId)
                 .seekAfter((Comparable<?>) null));
         assertTrue(e.getMessage().contains("must not be null"), e.getMessage());

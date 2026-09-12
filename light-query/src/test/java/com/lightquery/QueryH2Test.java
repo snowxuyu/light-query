@@ -25,12 +25,12 @@ class QueryH2Test {
     @BeforeAll
     void setUp() {
         h2 = new TestDb("query");
-        h2.db.insertBatch(List.of(
+        LightQuery.insertBatch(List.of(
                 h2.user("frank", User.Status.ACTIVE, 30, "100.00", "team-a", 0),
                 h2.user("frank%like", User.Status.ACTIVE, 40, "200.00", null, 0),
                 h2.user("alice", User.Status.FROZEN, 22, null, "team-b", 0),
                 h2.user("bob", User.Status.ACTIVE, 17, "0.00", "team-a", 0)));
-        h2.db.insertBatch(List.of(
+        LightQuery.insertBatch(List.of(
                 h2.order(1L, "50.00", 1),
                 h2.order(1L, "150.00", 2),
                 h2.order(3L, "500.00", 1)));
@@ -39,33 +39,33 @@ class QueryH2Test {
     @Test
     void likeEscapesUserWildcards() {
         // the literal name "frank%like" must match exactly, not widen the pattern
-        List<User> rows = h2.db.queryable(User.class).col(User::getName).like("frank%").toList();
+        List<User> rows = LightQuery.queryable(User.class).col(User::getName).like("frank%").toList();
         assertEquals(1, rows.size());
         assertEquals("frank%like", rows.get(0).getName());
     }
 
     @Test
     void startsWithAndEndsWith() {
-        assertEquals(2, h2.db.queryable(User.class).col(User::getName).startsWith("frank").count());
-        assertEquals(2, h2.db.queryable(User.class).col(User::getName).endsWith("e").count());
+        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).startsWith("frank").count());
+        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).endsWith("e").count());
     }
 
     @Test
     void inAndBetween() {
-        assertEquals(2, h2.db.queryable(User.class).col(User::getName).in("frank", "alice").count());
-        assertEquals(2, h2.db.queryable(User.class).col(User::getAge).between(20, 35).count());
+        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).in("frank", "alice").count());
+        assertEquals(2, LightQuery.queryable(User.class).col(User::getAge).between(20, 35).count());
     }
 
     @Test
     void nullSemantics() {
-        assertEquals(1, h2.db.queryable(User.class).col(User::getBalance).isNull().count());
-        assertEquals(3, h2.db.queryable(User.class).col(User::getBalance).isNotNull().count());
+        assertEquals(1, LightQuery.queryable(User.class).col(User::getBalance).isNull().count());
+        assertEquals(3, LightQuery.queryable(User.class).col(User::getBalance).isNotNull().count());
     }
 
     @Test
     void nestedGroups() {
         // status=ACTIVE AND (age < 18 OR balance >= 200)
-        List<User> rows = h2.db.queryable(User.class)
+        List<User> rows = LightQuery.queryable(User.class)
                 .col(User::getStatus).eq(User.Status.ACTIVE)
                 .and(w -> w.col(User::getAge).lt(18).or().col(User::getBalance).ge(new BigDecimal("200")))
                 .toList();
@@ -74,13 +74,13 @@ class QueryH2Test {
 
     @Test
     void orderByLimitAndFirst() {
-        List<User> top2 = h2.db.queryable(User.class)
+        List<User> top2 = LightQuery.queryable(User.class)
                 .orderByDesc(User::getAge)
                 .limit(2)
                 .toList();
         assertEquals(40, top2.get(0).getAge());
 
-        User youngest = h2.db.queryable(User.class)
+        User youngest = LightQuery.queryable(User.class)
                 .orderByAsc(User::getAge)
                 .firstOrNull();
         assertEquals(17, youngest.getAge());
@@ -88,7 +88,7 @@ class QueryH2Test {
 
     @Test
     void paginationTotals() {
-        PageResult<User> page = h2.db.queryable(User.class)
+        PageResult<User> page = LightQuery.queryable(User.class)
                 .orderByAsc(User::getId)
                 .toPageResult(2, 3);
         assertEquals(4, page.total());
@@ -99,23 +99,23 @@ class QueryH2Test {
 
     @Test
     void existsAndCount() {
-        assertTrue(h2.db.queryable(User.class).col(User::getName).eq("alice").exists());
-        assertFalse(h2.db.queryable(User.class).col(User::getName).eq("nobody").exists());
-        assertEquals(3, h2.db.queryable(User.class).col(User::getStatus).eq(User.Status.ACTIVE).count());
+        assertTrue(LightQuery.queryable(User.class).col(User::getName).eq("alice").exists());
+        assertFalse(LightQuery.queryable(User.class).col(User::getName).eq("nobody").exists());
+        assertEquals(3, LightQuery.queryable(User.class).col(User::getStatus).eq(User.Status.ACTIVE).count());
     }
 
     @Test
     void aggregateTerminals() {
-        assertEquals(new BigDecimal("300.00"), h2.db.queryable(User.class).sum(User::getBalance));
+        assertEquals(new BigDecimal("300.00"), LightQuery.queryable(User.class).sum(User::getBalance));
         assertEquals(0, java.math.BigDecimal.ZERO.compareTo(
-                (BigDecimal) h2.db.queryable(User.class).col(User::getName).eq("nobody").sum(User::getBalance)));
-        assertEquals(40, h2.db.queryable(User.class).max(User::getAge).intValue());
-        assertNull(h2.db.queryable(User.class).col(User::getName).eq("nobody").max(User::getAge));
+                (BigDecimal) LightQuery.queryable(User.class).col(User::getName).eq("nobody").sum(User::getBalance)));
+        assertEquals(40, LightQuery.queryable(User.class).max(User::getAge).intValue());
+        assertNull(LightQuery.queryable(User.class).col(User::getName).eq("nobody").max(User::getAge));
     }
 
     @Test
     void groupedTupleQuery() {
-        List<Tuple> rows = h2.db.queryable(Order.class)
+        List<Tuple> rows = LightQuery.queryable(Order.class)
                 .select(Order::getUserId)
                 .select(Aggregations.count().as("cnt"), Aggregations.sum(Order::getAmount).as("total"))
                 .groupBy(Order::getUserId)
@@ -130,7 +130,7 @@ class QueryH2Test {
 
     @Test
     void distinctProjection() {
-        List<Tuple> rows = h2.db.queryable(User.class)
+        List<Tuple> rows = LightQuery.queryable(User.class)
                 .select(User::getStatus)
                 .distinct()
                 .toTupleList();
@@ -140,6 +140,6 @@ class QueryH2Test {
     @Test
     void dynamicTableName() {
         // asTable routes the query to a physical table (sharding scenario)
-        assertEquals(0, h2.db.queryable(User.class).asTable("t_user_202401").count());
+        assertEquals(0, LightQuery.queryable(User.class).asTable("t_user_202401").count());
     }
 }

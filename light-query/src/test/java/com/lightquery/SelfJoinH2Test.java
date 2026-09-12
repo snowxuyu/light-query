@@ -28,7 +28,7 @@ class SelfJoinH2Test {
     void setUp() {
         support = TestSupport.employeeDb("selfjoin");
         db = support.session();
-        db.insertBatch(List.of(
+        LightQuery.insertBatch(List.of(
                 new Employee("Alice", null, "20000", 0),
                 new Employee("Bob", 1L, "12000", 0),
                 new Employee("Carol", 1L, "11000", 0),
@@ -41,7 +41,7 @@ class SelfJoinH2Test {
 
     @Test
     void selfJoinProjectsBothOccurrences() {
-        List<Tuple> rows = db.queryable(staff)
+        List<Tuple> rows = LightQuery.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
                 .col(manager.col(Employee::getName)).eq("Alice")
@@ -57,7 +57,7 @@ class SelfJoinH2Test {
     @Test
     void joinedOccurrenceIsNotLogicDeleteFiltered() {
         // Erin's manager Dave is logically deleted — the join still matches
-        List<Tuple> rows = db.queryable(staff)
+        List<Tuple> rows = LightQuery.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
                 .col(staff.col(Employee::getName)).eq("Erin")
@@ -70,7 +70,7 @@ class SelfJoinH2Test {
     @Test
     void rootOccurrenceStaysLogicDeleteFiltered() {
         // Dave (deleted=1) is a staff occurrence → filtered from the root side
-        long count = db.queryable(staff)
+        long count = LightQuery.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
                 .col(staff.col(Employee::getName)).eq("Dave")
@@ -81,7 +81,7 @@ class SelfJoinH2Test {
     @Test
     void lambdaOnDuplicatedEntityIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class, () ->
-                db.queryable(staff)
+                LightQuery.queryable(staff)
                         .leftJoin(manager, on -> on.eqColumn(
                                 staff.col(Employee::getManagerId), manager.col(Employee::getId)))
                         .col(Employee::getName).eq("Bob"));
@@ -92,7 +92,7 @@ class SelfJoinH2Test {
     @Test
     void plainClassSelfJoinIsRejected() {
         SqlBuildException e = assertThrows(SqlBuildException.class, () ->
-                db.queryable(Employee.class)
+                LightQuery.queryable(Employee.class)
                         .leftJoin(Employee.class, on -> on.col(Employee::getManagerId).eqColumn(Employee::getId)));
         assertTrue(e.getMessage().contains("QueryTable.of"), e.getMessage());
     }
@@ -101,7 +101,7 @@ class SelfJoinH2Test {
     void unregisteredOccurrenceIsRejected() {
         QueryTable<Employee> unknown = QueryTable.of(Employee.class, "ghost");
         SqlBuildException e = assertThrows(SqlBuildException.class, () ->
-                db.queryable(staff).col(unknown.col(Employee::getName)).eq("x"));
+                LightQuery.queryable(staff).col(unknown.col(Employee::getName)).eq("x"));
         assertTrue(e.getMessage().contains("ghost"), e.getMessage());
     }
 
@@ -109,7 +109,7 @@ class SelfJoinH2Test {
     void duplicateAliasIsRejected() {
         QueryTable<Employee> otherManager = QueryTable.of(Employee.class, "mgr");
         SqlBuildException e = assertThrows(SqlBuildException.class, () ->
-                db.queryable(staff)
+                LightQuery.queryable(staff)
                         .leftJoin(manager, on -> on.eqColumn(
                                 staff.col(Employee::getManagerId), manager.col(Employee::getId)))
                         .leftJoin(otherManager, on -> on.eqColumn(
@@ -126,7 +126,7 @@ class SelfJoinH2Test {
 
     @Test
     void leftJoinWithoutManagerWorks() {
-        List<Tuple> rows = db.queryable(staff)
+        List<Tuple> rows = LightQuery.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
                 .col(manager.col(Employee::getId)).isNull()
@@ -139,7 +139,7 @@ class SelfJoinH2Test {
     @Test
     void conditionsMixOccurrences() {
         // staff earns more than 10k and its manager earns more than 15k → only Bob
-        List<Tuple> rows = db.queryable(staff)
+        List<Tuple> rows = LightQuery.queryable(staff)
                 .leftJoin(manager, on -> on.eqColumn(
                         staff.col(Employee::getManagerId), manager.col(Employee::getId)))
                 .col(staff.col(Employee::getSalary)).gt(new java.math.BigDecimal("11000"))

@@ -25,11 +25,11 @@ class ProjectionH2Test {
     @BeforeAll
     void setUp() {
         h2 = new TestDb("projection");
-        h2.db.insertBatch(List.of(
+        LightQuery.insertBatch(List.of(
                 h2.user("alice", User.Status.ACTIVE, 30, "100", "vp", 0),
                 h2.user("bob", User.Status.FROZEN, 40, "200", null, 0),
                 h2.user("carol", User.Status.ACTIVE, 50, "300", null, 0)));
-        h2.db.insertBatch(List.of(
+        LightQuery.insertBatch(List.of(
                 h2.order(1L, "10", 1),
                 h2.order(1L, "20", 1),
                 h2.order(2L, "40", 1)));
@@ -59,7 +59,7 @@ class ProjectionH2Test {
 
     @Test
     void fullRowProjectsToRecordByName() {
-        List<UserRow> rows = h2.db.queryable(User.class)
+        List<UserRow> rows = LightQuery.queryable(User.class)
                 .orderByAsc(User::getName)
                 .toList(UserRow.class);
         assertEquals(3, rows.size());
@@ -69,7 +69,7 @@ class ProjectionH2Test {
 
     @Test
     void recordComponentsCoerceEnumsAndNumbers() {
-        List<FullUserRow> rows = h2.db.queryable(User.class)
+        List<FullUserRow> rows = LightQuery.queryable(User.class)
                 .col(User::getName).eq("alice")
                 .toList(FullUserRow.class);
         assertEquals(1, rows.size());
@@ -79,7 +79,7 @@ class ProjectionH2Test {
 
     @Test
     void aggregateAliasesProjectOntoRecord() {
-        List<OrderStat> rows = h2.db.queryable(Order.class)
+        List<OrderStat> rows = LightQuery.queryable(Order.class)
                 .select(Order::getUserId)
                 .select(Aggregations.count().as("orderCount"),
                         Aggregations.sum(Order::getAmount).as("totalAmount"))
@@ -95,7 +95,7 @@ class ProjectionH2Test {
 
     @Test
     void pojoProjectionUsesSetters() {
-        List<UserNameVo> rows = h2.db.queryable(User.class)
+        List<UserNameVo> rows = LightQuery.queryable(User.class)
                 .select(User::getName)
                 .orderByDesc(User::getName)
                 .toList(UserNameVo.class);
@@ -105,7 +105,7 @@ class ProjectionH2Test {
 
     @Test
     void projectedPageResultKeepsTotals() {
-        PageResult<UserRow> page = h2.db.queryable(User.class)
+        PageResult<UserRow> page = LightQuery.queryable(User.class)
                 .orderByAsc(User::getId)
                 .toPageResult(1, 2, UserRow.class);
         assertEquals(3, page.total());
@@ -115,7 +115,7 @@ class ProjectionH2Test {
 
     @Test
     void missingComponentColumnFailsWithLabelList() {
-        MappingException e = assertThrows(MappingException.class, () -> h2.db.queryable(User.class)
+        MappingException e = assertThrows(MappingException.class, () -> LightQuery.queryable(User.class)
                 .select(User::getName)
                 .toList(FullUserRow.class));
         assertTrue(e.getMessage().contains("id"), e.getMessage());

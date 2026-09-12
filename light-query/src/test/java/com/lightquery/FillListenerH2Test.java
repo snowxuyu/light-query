@@ -47,27 +47,27 @@ class FillListenerH2Test {
 
     @Test
     void insertFillsFields() {
-        User user = h2.db.insert(h2.user("fill-ins", User.Status.ACTIVE, 1, null, null, 0));
+        User user = LightQuery.insert(h2.user("fill-ins", User.Status.ACTIVE, 1, null, null, 0));
         assertEquals("filled-insert", user.getRemark());
-        assertEquals("filled-insert", h2.db.queryById(User.class, user.getId()).getRemark());
+        assertEquals("filled-insert", LightQuery.queryById(User.class, user.getId()).getRemark());
     }
 
     @Test
     void updateFillsFields() {
-        User user = h2.db.insert(h2.user("fill-upd", User.Status.ACTIVE, 1, null, null, 0));
+        User user = LightQuery.insert(h2.user("fill-upd", User.Status.ACTIVE, 1, null, null, 0));
         user.setRemark(null);
-        h2.db.update(user);
-        assertEquals("filled-update", h2.db.queryById(User.class, user.getId()).getRemark());
+        LightQuery.update(user);
+        assertEquals("filled-update", LightQuery.queryById(User.class, user.getId()).getRemark());
     }
 
     @Test
     void batchInsertFillsEveryEntity() {
-        List<User> users = h2.db.insertBatch(List.of(
+        List<User> users = LightQuery.insertBatch(List.of(
                 h2.user("fill-b1", User.Status.ACTIVE, 1, null, null, 0),
                 h2.user("fill-b2", User.Status.ACTIVE, 1, null, null, 0)));
         for (User user : users) {
             // batch insert does not back-fill identity ids: resolve by name
-            User loaded = h2.db.queryable(User.class).col(User::getName).eq(user.getName()).firstOrNull();
+            User loaded = LightQuery.queryable(User.class).col(User::getName).eq(user.getName()).firstOrNull();
             assertEquals("filled-insert", loaded.getRemark());
         }
     }
@@ -82,8 +82,8 @@ class FillListenerH2Test {
         });
         try {
             assertThrows(IllegalStateException.class,
-                    () -> h2.db.insert(h2.user("fill-fail", User.Status.ACTIVE, 1, null, null, 0)));
-            assertEquals(0, h2.db.queryable(User.class).col(User::getName).eq("fill-fail").count());
+                    () -> LightQuery.insert(h2.user("fill-fail", User.Status.ACTIVE, 1, null, null, 0)));
+            assertEquals(0, LightQuery.queryable(User.class).col(User::getName).eq("fill-fail").count());
         } finally {
             LightQuery.setFillListener(new FillListener() {
                 @Override
@@ -107,7 +107,7 @@ class FillListenerH2Test {
     void clearStopsFilling() {
         LightQuery.clearFillListener();
         try {
-            User user = h2.db.insert(h2.user("fill-none", User.Status.ACTIVE, 1, null, null, 0));
+            User user = LightQuery.insert(h2.user("fill-none", User.Status.ACTIVE, 1, null, null, 0));
             assertNull(user.getRemark());
         } finally {
             LightQuery.clearFillListener();

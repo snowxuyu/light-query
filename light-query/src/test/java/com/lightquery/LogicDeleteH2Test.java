@@ -22,56 +22,56 @@ class LogicDeleteH2Test {
     @BeforeAll
     void setUp() {
         h2 = new TestDb("logic");
-        h2.db.insertBatch(List.of(
+        LightQuery.insertBatch(List.of(
                 h2.user("alive", User.Status.ACTIVE, 1, null, null, 0),
                 h2.user("dead", User.Status.ACTIVE, 2, null, null, 1)));
     }
 
     @Test
     void queriesExcludeDeletedByDefault() {
-        assertEquals(1, h2.db.queryable(User.class)
+        assertEquals(1, LightQuery.queryable(User.class)
                 .col(User::getName).in(List.of("alive", "dead")).count());
-        assertNull(h2.db.queryable(User.class).col(User::getName).eq("dead").firstOrNull());
+        assertNull(LightQuery.queryable(User.class).col(User::getName).eq("dead").firstOrNull());
     }
 
     @Test
     void includeDeletedShowsEverything() {
-        assertEquals(2, h2.db.queryable(User.class).includeDeleted()
+        assertEquals(2, LightQuery.queryable(User.class).includeDeleted()
                 .col(User::getName).in(List.of("alive", "dead")).count());
     }
 
     @Test
     void deleteEntityBecomesUpdate() {
-        User user = h2.db.insert(h2.user("temporary", User.Status.ACTIVE, 3, null, null, 0));
-        h2.db.delete(user);
+        User user = LightQuery.insert(h2.user("temporary", User.Status.ACTIVE, 3, null, null, 0));
+        LightQuery.delete(user);
         // the row is still there, flagged
-        User raw = h2.db.queryable(User.class).includeDeleted()
+        User raw = LightQuery.queryable(User.class).includeDeleted()
                 .col(User::getId).eq(user.getId()).firstOrNull();
         assertEquals(1, raw.getDeleted());
         // and invisible through normal queries
-        assertNull(h2.db.queryById(User.class, user.getId()));
+        assertNull(LightQuery.queryById(User.class, user.getId()));
     }
 
     @Test
     void physicalDeleteRemovesRow() {
-        User user = h2.db.insert(h2.user("hard", User.Status.ACTIVE, 4, null, null, 0));
-        h2.db.deletable(User.class).physical().col(User::getId).eq(user.getId()).execute();
-        assertEquals(null, h2.db.queryable(User.class).includeDeleted()
+        User user = LightQuery.insert(h2.user("hard", User.Status.ACTIVE, 4, null, null, 0));
+        LightQuery.deletable(User.class).physical().col(User::getId).eq(user.getId()).execute();
+        assertEquals(null, LightQuery.queryable(User.class).includeDeleted()
                 .col(User::getId).eq(user.getId()).firstOrNull());
     }
 
     @Test
     void deletableBecomesUpdateByDefault() {
-        h2.db.insert(h2.user("bulk1", User.Status.FROZEN, 5, null, null, 0));
-        h2.db.insert(h2.user("bulk2", User.Status.FROZEN, 6, null, null, 0));
-        int rows = h2.db.deletable(User.class).col(User::getName).startsWith("bulk").execute();
+        LightQuery.insert(h2.user("bulk1", User.Status.FROZEN, 5, null, null, 0));
+        LightQuery.insert(h2.user("bulk2", User.Status.FROZEN, 6, null, null, 0));
+        int rows = LightQuery.deletable(User.class).col(User::getName).startsWith("bulk").execute();
         assertEquals(2, rows);
-        assertEquals(0, h2.db.queryable(User.class).col(User::getName).startsWith("bulk").count());
+        assertEquals(0, LightQuery.queryable(User.class).col(User::getName).startsWith("bulk").count());
     }
 
     @Test
     void updatableSkipsDeletedRows() {
-        int rows = h2.db.updatable(User.class)
+        int rows = LightQuery.updatable(User.class)
                 .col(User::getAge).set(99)
                 .col(User::getName).eq("dead")
                 .execute();
@@ -80,7 +80,7 @@ class LogicDeleteH2Test {
 
     @Test
     void updatableIncludeDeletedOverrides() {
-        int rows = h2.db.updatable(User.class)
+        int rows = LightQuery.updatable(User.class)
                 .col(User::getAge).set(99)
                 .includeDeleted()
                 .col(User::getName).eq("dead")
@@ -101,8 +101,8 @@ class LogicDeleteH2Test {
     @Test
     void deletingAlreadyDeletedRowStillReportsOneRow() {
         // idempotent delete: UPDATE ... WHERE pk (no logic filter) always hits the row
-        User dead = h2.db.queryable(User.class).includeDeleted()
+        User dead = LightQuery.queryable(User.class).includeDeleted()
                 .col(User::getName).eq("dead").firstOrNull();
-        h2.db.delete(dead); // must not throw UnexpectedRowsException
+        LightQuery.delete(dead); // must not throw UnexpectedRowsException
     }
 }

@@ -13,8 +13,8 @@ import javax.sql.DataSource;
 
 /**
  * Test databases outside the standard TestDb schema (v0.2 feature fixtures).
- * Each helper creates an isolated in-memory H2 database plus a standalone
- * session (registered nowhere).
+ * Each helper creates an isolated in-memory H2 database and registers it as
+ * the facade primary so tests use {@code LightQuery.queryable(...)} directly.
  */
 public final class TestSupport {
 
@@ -43,7 +43,9 @@ public final class TestSupport {
         } catch (SQLException e) {
             throw new IllegalStateException("cannot prepare H2 schema", e);
         }
-        return new TestSupport(ds, LightQuery.of(ds));
+        LightQuery.reset();
+        LightQuery.primary(ds);
+        return new TestSupport(ds, LightQuery.primary(ds));
     }
 
     public DataSource dataSource() {

@@ -35,7 +35,9 @@ class SequenceH2Test {
     void setUp() {
         dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:seqtest;DB_CLOSE_DELAY=-1");
-        db = LightQuery.of(dataSource);
+        LightQuery.reset();
+        LightQuery.primary(dataSource);
+        db = LightQuery.primary(dataSource);
         try (Connection connection = dataSource.getConnection();
              Statement st = connection.createStatement()) {
             st.execute("DROP SEQUENCE IF EXISTS \"invoice_seq\"");
@@ -53,23 +55,23 @@ class SequenceH2Test {
 
     @Test
     void insertFetchesNextvalAndWritesTheId() {
-        SequencedInvoice first = db.insert(new SequencedInvoice("inv-1"));
+        SequencedInvoice first = LightQuery.insert(new SequencedInvoice("inv-1"));
         assertTrue(first.getId() >= 100, "sequence starts at 100, got " + first.getId());
-        assertEquals("inv-1", db.queryById(SequencedInvoice.class, first.getId()).getRef());
+        assertEquals("inv-1", LightQuery.queryById(SequencedInvoice.class, first.getId()).getRef());
 
-        SequencedInvoice second = db.insert(new SequencedInvoice("inv-2"));
+        SequencedInvoice second = LightQuery.insert(new SequencedInvoice("inv-2"));
         assertEquals(first.getId() + 1, second.getId());
     }
 
     @Test
     void insertBatchFetchesAValuePerEntity() {
-        List<SequencedInvoice> batch = db.insertBatch(List.of(
+        List<SequencedInvoice> batch = LightQuery.insertBatch(List.of(
                 new SequencedInvoice("batch-1"),
                 new SequencedInvoice("batch-2"),
                 new SequencedInvoice("batch-3")));
         assertEquals(3, batch.size());
         batch.forEach(invoice -> assertEquals(invoice.getRef(),
-                db.queryById(SequencedInvoice.class, invoice.getId()).getRef()));
+                LightQuery.queryById(SequencedInvoice.class, invoice.getId()).getRef()));
         batch.stream().map(SequencedInvoice::getId).distinct().count();
         assertEquals(3, batch.stream().map(SequencedInvoice::getId).distinct().count());
     }

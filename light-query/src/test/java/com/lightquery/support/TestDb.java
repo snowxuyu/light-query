@@ -29,7 +29,9 @@ public final class TestDb {
         JdbcDataSource ds = new JdbcDataSource();
         ds.setURL("jdbc:h2:mem:" + name + ";DB_CLOSE_DELAY=-1");
         this.dataSource = ds;
-        this.db = LightQuery.of(ds);
+        LightQuery.reset();
+        LightQuery.primary(ds);
+        this.db = LightQuery.primary(ds);
         try (Connection connection = ds.getConnection();
              Statement st = connection.createStatement()) {
             st.execute("DROP TABLE IF EXISTS \"t_user\"");

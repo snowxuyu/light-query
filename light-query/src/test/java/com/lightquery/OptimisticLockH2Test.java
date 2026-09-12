@@ -36,7 +36,9 @@ class OptimisticLockH2Test {
     void setUp() {
         dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:optlock;DB_CLOSE_DELAY=-1");
-        db = LightQuery.of(dataSource);
+        LightQuery.reset();
+        LightQuery.primary(dataSource);
+        db = LightQuery.primary(dataSource);
         try (Connection connection = dataSource.getConnection();
              Statement st = connection.createStatement()) {
             st.execute("DROP TABLE IF EXISTS \"t_versioned_doc\"");
@@ -61,63 +63,63 @@ class OptimisticLockH2Test {
 
     @Test
     void insertInitialisesVersionToZero() {
-        VersionedDoc doc = db.insert(new VersionedDoc("insert-version"));
+        VersionedDoc doc = LightQuery.insert(new VersionedDoc("insert-version"));
         assertEquals(0, doc.getVersion());
-        assertEquals(0, db.queryById(VersionedDoc.class, doc.getId()).getVersion());
+        assertEquals(0, LightQuery.queryById(VersionedDoc.class, doc.getId()).getVersion());
     }
 
     @Test
     void updateBumpsVersionAndBackfills() {
-        VersionedDoc doc = db.insert(new VersionedDoc("update-version"));
+        VersionedDoc doc = LightQuery.insert(new VersionedDoc("update-version"));
         doc.setTitle("update-version-2");
-        db.update(doc);
+        LightQuery.update(doc);
         assertEquals(1, doc.getVersion());
-        VersionedDoc loaded = db.queryById(VersionedDoc.class, doc.getId());
+        VersionedDoc loaded = LightQuery.queryById(VersionedDoc.class, doc.getId());
         assertEquals(1, loaded.getVersion());
         assertEquals("update-version-2", loaded.getTitle());
     }
 
     @Test
     void updateSelectiveAlsoAppliesVersion() {
-        VersionedDoc doc = db.insert(new VersionedDoc("selective-version"));
+        VersionedDoc doc = LightQuery.insert(new VersionedDoc("selective-version"));
         doc.setTitle("selective-version-2");
-        db.updateSelective(doc);
+        LightQuery.updateSelective(doc);
         assertEquals(1, doc.getVersion());
-        assertEquals(1, db.queryById(VersionedDoc.class, doc.getId()).getVersion());
+        assertEquals(1, LightQuery.queryById(VersionedDoc.class, doc.getId()).getVersion());
     }
 
     @Test
     void staleVersionFailsWithOptimisticLockException() {
-        VersionedDoc doc = db.insert(new VersionedDoc("conflict"));
-        VersionedDoc firstReader = db.queryById(VersionedDoc.class, doc.getId());
-        VersionedDoc secondReader = db.queryById(VersionedDoc.class, doc.getId());
+        VersionedDoc doc = LightQuery.insert(new VersionedDoc("conflict"));
+        VersionedDoc firstReader = LightQuery.queryById(VersionedDoc.class, doc.getId());
+        VersionedDoc secondReader = LightQuery.queryById(VersionedDoc.class, doc.getId());
 
         firstReader.setTitle("winner");
-        db.update(firstReader);
+        LightQuery.update(firstReader);
 
         secondReader.setTitle("loser");
         OptimisticLockException e = assertThrows(OptimisticLockException.class,
-                () -> db.update(secondReader));
+                () -> LightQuery.update(secondReader));
         assertTrue(e.getMessage().contains("concurrently"), e.getMessage());
         // the losing update wrote nothing
-        assertEquals("winner", db.queryById(VersionedDoc.class, doc.getId()).getTitle());
+        assertEquals("winner", LightQuery.queryById(VersionedDoc.class, doc.getId()).getTitle());
     }
 
     @Test
     void deleteUsesVersionPredicate() {
-        VersionedDoc doc = db.insert(new VersionedDoc("delete-version"));
-        db.delete(doc);
-        assertEquals(null, db.queryById(VersionedDoc.class, doc.getId()));
+        VersionedDoc doc = LightQuery.insert(new VersionedDoc("delete-version"));
+        LightQuery.delete(doc);
+        assertEquals(null, LightQuery.queryById(VersionedDoc.class, doc.getId()));
         // replaying the delete with the stale entity affects 0 rows → optimistic lock failure
-        assertThrows(OptimisticLockException.class, () -> db.delete(doc));
+        assertThrows(OptimisticLockException.class, () -> LightQuery.delete(doc));
     }
 
     @Test
     void logicDeleteBumpsVersion() {
-        VersionedArticle article = db.insert(new VersionedArticle("article"));
-        db.delete(article);
+        VersionedArticle article = LightQuery.insert(new VersionedArticle("article"));
+        LightQuery.delete(article);
         assertEquals(1, article.getVersion());
-        VersionedArticle loaded = db.queryById(VersionedArticle.class, article.getId());
+        VersionedArticle loaded = LightQuery.queryById(VersionedArticle.class, article.getId());
         assertEquals(null, loaded);
     }
 

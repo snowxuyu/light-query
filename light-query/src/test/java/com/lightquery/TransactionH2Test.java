@@ -26,26 +26,26 @@ class TransactionH2Test {
 
     @Test
     void commitPersistsAllWork() {
-        Long id = h2.db.inTransaction(tx -> {
+        Long id = LightQuery.inTransaction(tx -> {
             tx.insert(h2.user("txCommit", User.Status.ACTIVE, 1, null, null, 0));
             tx.updatable(User.class).col(User::getRemark).set("tx").col(User::getName).eq("txCommit").execute();
             return tx.queryable(User.class).col(User::getName).eq("txCommit").firstOrNull().getId();
         });
-        assertEquals("tx", h2.db.queryById(User.class, id).getRemark());
+        assertEquals("tx", LightQuery.queryById(User.class, id).getRemark());
     }
 
     @Test
     void rollbackRevertsEverythingAndRethrows() {
-        assertThrows(IllegalStateException.class, () -> h2.db.inTransaction(tx -> {
+        assertThrows(IllegalStateException.class, () -> LightQuery.inTransaction(tx -> {
             tx.insert(h2.user("txRollback", User.Status.ACTIVE, 1, null, null, 0));
             throw new IllegalStateException("boom");
         }));
-        assertEquals(0, h2.db.queryable(User.class).col(User::getName).eq("txRollback").count());
+        assertEquals(0, LightQuery.queryable(User.class).col(User::getName).eq("txRollback").count());
     }
 
     @Test
     void checkedStyleFailuresRollBackToo() {
-        assertThrows(RuntimeException.class, () -> h2.db.inTransaction(tx -> {
+        assertThrows(RuntimeException.class, () -> LightQuery.inTransaction(tx -> {
             tx.insert(h2.user("txFail", User.Status.ACTIVE, 1, null, null, 0));
             // simulate any failure inside the work
             if (true) {
@@ -53,29 +53,29 @@ class TransactionH2Test {
             }
             return null;
         }));
-        assertEquals(0, h2.db.queryable(User.class).col(User::getName).eq("txFail").count());
+        assertEquals(0, LightQuery.queryable(User.class).col(User::getName).eq("txFail").count());
     }
 
     @Test
     void nestedTransactionReusesOuterConnection() {
-        String name = h2.db.inTransaction(outer -> outer.inTransaction(inner -> {
+        String name = LightQuery.inTransaction(outer -> outer.inTransaction(inner -> {
             inner.insert(h2.user("nested", User.Status.ACTIVE, 1, null, null, 0));
             return "nested-ok";
         }));
         assertEquals("nested-ok", name);
-        assertEquals(1, h2.db.queryable(User.class).col(User::getName).eq("nested").count());
+        assertEquals(1, LightQuery.queryable(User.class).col(User::getName).eq("nested").count());
     }
 
     @Test
     void statementsOutsideTransactionDoNotSeeUncommittedData() throws Exception {
-        h2.db.inTransaction(tx -> {
+        LightQuery.inTransaction(tx -> {
             tx.insert(h2.user("isolation", User.Status.ACTIVE, 1, null, null, 0));
             // a fresh connection (different transaction) must not see the row yet
-            long visible = h2.db.queryable(User.class).col(User::getName).eq("isolation").count();
+            long visible = LightQuery.queryable(User.class).col(User::getName).eq("isolation").count();
             assertEquals(0, visible);
             return null;
         });
-        assertEquals(1, h2.db.queryable(User.class).col(User::getName).eq("isolation").count());
+        assertEquals(1, LightQuery.queryable(User.class).col(User::getName).eq("isolation").count());
         assertTrue(true);
     }
 }
