@@ -11,7 +11,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** T7 — logic delete: filtering, delete→update conversion, escape hatches. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

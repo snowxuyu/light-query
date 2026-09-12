@@ -3,7 +3,6 @@ package com.lightquery;
 import com.lightquery.exec.ConnectionProvider;
 import com.lightquery.exec.DataSourceConnectionProvider;
 import com.lightquery.exec.EntityOperations;
-import com.lightquery.exec.JdbcExecutor;
 import com.lightquery.exec.SingleConnectionProvider;
 import com.lightquery.exception.DataAccessException;
 import com.lightquery.exception.LightQueryException;

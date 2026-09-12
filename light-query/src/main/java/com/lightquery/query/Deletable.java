@@ -11,14 +11,12 @@ import com.lightquery.query.model.Condition;
 import com.lightquery.query.model.ConditionGroup;
 import com.lightquery.query.model.JoinSpec;
 import com.lightquery.query.model.JoinType;
-import com.lightquery.query.model.Operator;
 import com.lightquery.query.model.QueryModel;
 import com.lightquery.query.model.TableRef;
 import com.lightquery.sqlgen.SqlBuilder;
 import com.lightquery.sqlgen.SqlFragment;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 

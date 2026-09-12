@@ -766,8 +766,33 @@ light-query-parent/
 
 ## 14. Roadmap
 
-| 版本 | 内容 |
+### 已发布
+
+| 版本 | 核心能力 |
 |---|---|
-| v0.2（本轮已实现） | `@Version` 乐观锁、`SEQUENCE` 主键、自连接（QueryTable/TableColumn）、spring-boot-starter（SpringConnectionProvider 对接 Spring 事务）、字段自动填充监听器 SPI（FillListener） |
-| v0.3（进行中，分支 `dev/0.3.0`） | 已实现：VO/record 投影 select、seek 分页（逻辑分页）、Oracle/SQLServer 方言、update join / delete join；待实现：达梦方言、审计拦截器 SPI |
-| v1.0 | API 冻结、长期兼容承诺、性能基准报告（JMH）、多驱动兼容矩阵 |
+| 0.1.0 | 实体映射（JPA 注解）/ lambda 条件 / join / 子查询 / 聚合 / 逻辑删除 / 事务 / 方言 |
+| 0.2.0 | 静态门面 + 多数据源 / `@Version` 乐观锁 / SEQUENCE 主键 / 自连接（QueryTable）/ FillListener SPI / Spring Boot Starter / update join / delete join |
+| 0.3.0（开发中） | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 |
+
+### 0.4.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
+
+| 特性 | 动机 | 说明 |
+|---|---|---|
+| SQL 日志 SPI | MP/jOOQ 内置，排查问题必备 | `SqlLogger` 接口（before/after），默认 SLF4J 适配器，零依赖默认关闭 |
+| 自定义类型处理器 | MP `TypeHandler`，jOOQ Converter | JPA `AttributeConverter` 透传 + 自定义 `ValueConverter<V, D>` SPI |
+| 批量写入优化 | MP `saveBatch` 支持分批提交 | `insertBatch` 增加 `batchSize` 重载；upsert（MySQL `ON DUPLICATE KEY` / PG `ON CONFLICT`）|
+| 条件复用与组合 | jOOQ `Condition.and/or` 可组合 | `TypedColumn` 产物可缓存、跨查询复用（`ConditionGroup` 已是树，暴露组合 API）|
+| 审计拦截器 SPI | MP `MetaObjectHandler` / JPA `@PrePersist` | 操作类型 + 实体快照 + 时间戳，行级 before/after 钩子 |
+
+### 0.5.0+ 规划（中远期）
+
+| 特性 | 动机 | 说明 |
+|---|---|---|
+| 关系映射 | 全部主流 ORM 都有 `@OneToMany` | `@Parent` / `@Children` 注解，级联加载（不级联写入——保持轻量）|
+| 达梦 / 金仓方言 | 信创需求 | 扩展 `Dialect` 接口即可 |
+| UNION / 窗口函数 / CTE | jOOQ 完整 SQL DSL | `Queryable.union(...)` / `rowNumber() OVER` / `WITH cte AS` |
+| 性能基准报告 | jOOQ 有 JMH 报告 | JMH 对比 JDBC / MyBatis-Plus / light-query |
+
+### 1.0.0 规划
+
+API 冻结承诺 + 多驱动兼容矩阵（MySQL 5.7/8.0、PG 12–16、Oracle 19c、SQL Server 2016+、H2 2.x）+ 安全审计 + JMH 报告。

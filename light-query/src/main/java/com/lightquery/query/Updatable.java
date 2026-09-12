@@ -19,7 +19,6 @@ import com.lightquery.sqlgen.SqlBuilder;
 import com.lightquery.sqlgen.SqlFragment;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 
