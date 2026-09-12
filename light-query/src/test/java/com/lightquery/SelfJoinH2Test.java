@@ -19,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SelfJoinH2Test {
 
     private TestSupport support;
-    private LightQuerySession db;
 
     private QueryTable<Employee> staff;
     private QueryTable<Employee> manager;
@@ -27,7 +26,6 @@ class SelfJoinH2Test {
     @BeforeAll
     void setUp() {
         support = TestSupport.employeeDb("selfjoin");
-        db = support.session();
         LightQuery.insertBatch(List.of(
                 new Employee("Alice", null, "20000", 0),
                 new Employee("Bob", 1L, "12000", 0),

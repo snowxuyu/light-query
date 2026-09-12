@@ -28,7 +28,7 @@ class DialectShapeTest {
 
     @Test
     void oraclePaginationAndQuoting() {
-        String sql = h2.db.dialect(new OracleDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new OracleDialect())
                 .queryable(User.class)
                 .col(User::getStatus).eq(User.Status.ACTIVE)
                 .orderByAsc(User::getId)
@@ -47,7 +47,7 @@ class DialectShapeTest {
 
     @Test
     void sqlServerPaginationAppendsNeutralOrderWhenMissing() {
-        String sql = h2.db.dialect(new SqlServerDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new SqlServerDialect())
                 .queryable(User.class)
                 .limit(20)
                 .toSql();
@@ -56,7 +56,7 @@ class DialectShapeTest {
 
     @Test
     void sqlServerPaginationKeepsUserOrderBy() {
-        String sql = h2.db.dialect(new SqlServerDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new SqlServerDialect())
                 .queryable(User.class)
                 .orderByDesc(User::getAge)
                 .limit(20)
@@ -67,7 +67,7 @@ class DialectShapeTest {
 
     @Test
     void sqlServerEscapesLikeAndSupportsSequences() {
-        String sql = h2.db.dialect(new SqlServerDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new SqlServerDialect())
                 .queryable(User.class)
                 .col(User::getName).like("frank")
                 .toSql();

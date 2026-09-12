@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OptimisticLockH2Test {
 
     private JdbcDataSource dataSource;
-    private LightQuerySession db;
 
     @BeforeAll
     void setUp() {
@@ -38,7 +37,6 @@ class OptimisticLockH2Test {
         dataSource.setURL("jdbc:h2:mem:optlock;DB_CLOSE_DELAY=-1");
         LightQuery.reset();
         LightQuery.primary(dataSource);
-        db = LightQuery.primary(dataSource);
         try (Connection connection = dataSource.getConnection();
              Statement st = connection.createStatement()) {
             st.execute("DROP TABLE IF EXISTS \"t_versioned_doc\"");

@@ -38,7 +38,7 @@ class UpdateJoinTest {
 
     @Test
     void mysqlUpdateJoinShape() {
-        String sql = h2.db.dialect(new MySqlDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new MySqlDialect())
                 .updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(User::getStatus).set(User.Status.FROZEN)
@@ -54,7 +54,7 @@ class UpdateJoinTest {
 
     @Test
     void postgresUpdateJoinShape() {
-        String sql = h2.db.dialect(new PostgreSqlDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new PostgreSqlDialect())
                 .updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(User::getStatus).set(User.Status.FROZEN)
@@ -69,7 +69,7 @@ class UpdateJoinTest {
 
     @Test
     void sqlServerUpdateJoinShape() {
-        String sql = h2.db.dialect(new SqlServerDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new SqlServerDialect())
                 .updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(User::getStatus).set(User.Status.FROZEN)
@@ -84,7 +84,7 @@ class UpdateJoinTest {
 
     @Test
     void incrementIsQualifiedInJoinUpdates() {
-        String sql = h2.db.dialect(new MySqlDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new MySqlDialect())
                 .updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(User::getAge).setIncrement(1)
@@ -95,7 +95,7 @@ class UpdateJoinTest {
 
     @Test
     void logicDeleteJoinBecomesUpdateWithJoin() {
-        String sql = h2.db.dialect(new MySqlDialect())
+        String sql = LightQuery.primary(h2.dataSource).dialect(new MySqlDialect())
                 .deletable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(Order::getAmount).gt(BIG_AMOUNT)
@@ -109,7 +109,7 @@ class UpdateJoinTest {
 
     @Test
     void physicalDeleteJoinShapes() {
-        String mysql = h2.db.dialect(new MySqlDialect())
+        String mysql = LightQuery.primary(h2.dataSource).dialect(new MySqlDialect())
                 .deletable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .physical()
@@ -120,7 +120,7 @@ class UpdateJoinTest {
                         + " | params=[100]",
                 mysql);
 
-        String pg = h2.db.dialect(new PostgreSqlDialect())
+        String pg = LightQuery.primary(h2.dataSource).dialect(new PostgreSqlDialect())
                 .deletable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .physical()
@@ -134,8 +134,7 @@ class UpdateJoinTest {
 
     @Test
     void h2DoesNotSupportJoinWrites() {
-        SqlBuildException updateError = assertThrows(SqlBuildException.class, () -> h2.db
-                .updatable(User.class)
+        SqlBuildException updateError = assertThrows(SqlBuildException.class, () -> LightQuery.updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(User::getStatus).set(User.Status.FROZEN)
                 .col(Order::getAmount).gt(BIG_AMOUNT)
@@ -143,8 +142,7 @@ class UpdateJoinTest {
         assertTrue(updateError.getMessage().contains("does not support UPDATE with JOIN"),
                 updateError.getMessage());
 
-        SqlBuildException deleteError = assertThrows(SqlBuildException.class, () -> h2.db
-                .deletable(User.class)
+        SqlBuildException deleteError = assertThrows(SqlBuildException.class, () -> LightQuery.deletable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .physical()
                 .col(Order::getAmount).gt(BIG_AMOUNT)
@@ -155,8 +153,7 @@ class UpdateJoinTest {
 
     @Test
     void oracleDoesNotSupportJoinWrites() {
-        SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
-                .dialect(new OracleDialect())
+        SqlBuildException e = assertThrows(SqlBuildException.class, () -> LightQuery.primary(h2.dataSource).dialect(new OracleDialect())
                 .updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(User::getStatus).set(User.Status.FROZEN)
@@ -167,8 +164,7 @@ class UpdateJoinTest {
 
     @Test
     void setOnJoinedEntityIsRejected() {
-        SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
-                .updatable(User.class)
+        SqlBuildException e = assertThrows(SqlBuildException.class, () -> LightQuery.updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .col(Order::getAmount).set(BIG_AMOUNT));
         assertTrue(e.getMessage().contains("modifies the updated entity only"), e.getMessage());
@@ -176,16 +172,14 @@ class UpdateJoinTest {
 
     @Test
     void conditionOnUnjoinedEntityIsRejected() {
-        SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
-                .updatable(User.class)
+        SqlBuildException e = assertThrows(SqlBuildException.class, () -> LightQuery.updatable(User.class)
                 .col(Order::getAmount).eq(BIG_AMOUNT));
         assertTrue(e.getMessage().contains("is not part of this update"), e.getMessage());
     }
 
     @Test
     void joiningTheSameEntityTwiceIsRejected() {
-        SqlBuildException e = assertThrows(SqlBuildException.class, () -> h2.db
-                .updatable(User.class)
+        SqlBuildException e = assertThrows(SqlBuildException.class, () -> LightQuery.updatable(User.class)
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId)));
         assertTrue(e.getMessage().contains("already part of this query"), e.getMessage());

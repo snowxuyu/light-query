@@ -1,7 +1,6 @@
 package com.lightquery.support;
 
 import com.lightquery.LightQuery;
-import com.lightquery.LightQuerySession;
 
 import org.h2.jdbcx.JdbcDataSource;
 
@@ -19,11 +18,9 @@ import javax.sql.DataSource;
 public final class TestSupport {
 
     private final DataSource dataSource;
-    private final LightQuerySession session;
 
-    private TestSupport(DataSource dataSource, LightQuerySession session) {
+    private TestSupport(DataSource dataSource) {
         this.dataSource = dataSource;
-        this.session = session;
     }
 
     public static TestSupport employeeDb(String name) {
@@ -45,14 +42,10 @@ public final class TestSupport {
         }
         LightQuery.reset();
         LightQuery.primary(ds);
-        return new TestSupport(ds, LightQuery.primary(ds));
+        return new TestSupport(ds);
     }
 
     public DataSource dataSource() {
         return dataSource;
-    }
-
-    public LightQuerySession session() {
-        return session;
     }
 }

@@ -26,7 +26,7 @@ class SqlSnapshotTest {
     @BeforeAll
     void setUp() {
         h2 = new TestDb("snapshot");
-        db = h2.db.dialect(new MySqlDialect());
+        db = LightQuery.primary(h2.dataSource).dialect(new MySqlDialect());
     }
 
     @Test
@@ -174,7 +174,7 @@ class SqlSnapshotTest {
 
     @Test
     void postgresqlQuotingAndLikeEscape() {
-        LightQuerySession pg = h2.db.dialect(new PostgreSqlDialect());
+        LightQuerySession pg = LightQuery.primary(h2.dataSource).dialect(new PostgreSqlDialect());
         String sql = pg.queryable(User.class)
                 .col(User::getName).like("a%b")
                 .toSql();

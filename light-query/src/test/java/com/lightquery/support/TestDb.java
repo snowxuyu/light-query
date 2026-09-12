@@ -1,7 +1,6 @@
 package com.lightquery.support;
 
 import com.lightquery.LightQuery;
-import com.lightquery.LightQuerySession;
 import com.lightquery.entity.Order;
 import com.lightquery.entity.User;
 
@@ -23,7 +22,6 @@ import javax.sql.DataSource;
 public final class TestDb {
 
     public final DataSource dataSource;
-    public final LightQuerySession db;
 
     public TestDb(String name) {
         JdbcDataSource ds = new JdbcDataSource();
@@ -31,7 +29,6 @@ public final class TestDb {
         this.dataSource = ds;
         LightQuery.reset();
         LightQuery.primary(ds);
-        this.db = LightQuery.primary(ds);
         try (Connection connection = ds.getConnection();
              Statement st = connection.createStatement()) {
             st.execute("DROP TABLE IF EXISTS \"t_user\"");

@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SequenceH2Test {
 
     private JdbcDataSource dataSource;
-    private LightQuerySession db;
 
     @BeforeAll
     void setUp() {
@@ -37,7 +36,6 @@ class SequenceH2Test {
         dataSource.setURL("jdbc:h2:mem:seqtest;DB_CLOSE_DELAY=-1");
         LightQuery.reset();
         LightQuery.primary(dataSource);
-        db = LightQuery.primary(dataSource);
         try (Connection connection = dataSource.getConnection();
              Statement st = connection.createStatement()) {
             st.execute("DROP SEQUENCE IF EXISTS \"invoice_seq\"");
@@ -78,7 +76,7 @@ class SequenceH2Test {
 
     @Test
     void dialectWithoutSequencesIsRejected() {
-        LightQuerySession mysql = LightQuery.of(dataSource, new MySqlDialect());
+        LightQuerySession mysql = LightQuery.primary(dataSource).dialect(new MySqlDialect());
         SqlBuildException e = assertThrows(SqlBuildException.class,
                 () -> mysql.insert(new SequencedInvoice("no-seq")));
         assertTrue(e.getMessage().contains("does not support sequences"), e.getMessage());
