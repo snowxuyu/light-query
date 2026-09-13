@@ -157,6 +157,28 @@ public final class Queryable<T> {
         return this;
     }
 
+    /**
+     * Combines this query with another using UNION (deduplicates rows).
+     * Both queries must have the same number and order of columns.
+     */
+    public Queryable<T> union(Queryable<T> other) {
+        ensureOpen();
+        other.ensureOpen();
+        model.getUnionPartners().add(other.model);
+        return this;
+    }
+
+    /**
+     * Combines this query with another using UNION ALL (keeps duplicates).
+     */
+    public Queryable<T> unionAll(Queryable<T> other) {
+        ensureOpen();
+        other.ensureOpen();
+        model.setUnionAll(true);
+        model.getUnionPartners().add(other.model);
+        return this;
+    }
+
     // ------------------------------------------------------------------ sub-queries
 
     /** {@code col IN (SELECT …)} — correlated references to outer entities work. */

@@ -20,6 +20,7 @@ import jakarta.persistence.OptimisticLockException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Single-table entity CRUD (insert / update by id / delete by id). Builds
@@ -159,6 +160,26 @@ public final class EntityOperations {
         SqlFragment fragment = new SqlFragment(
                 dialect.upsertSql(meta.getTableName(), names, keyColumns, 1), values);
         JdbcExecutor.execute(connections, fragment);
+    }
+
+    /**
+     * Application-level save-or-update: checks existence by PK, then
+     * INSERT (with identity/sequence key generation) or UPDATE accordingly.
+     * For high-throughput scenarios prefer {@code upsert(...)} (database-level).
+     */
+    public static <E> E saveOrUpdate(ConnectionProvider connections, Dialect dialect, E entity) {
+        EntityMeta meta = EntityMetaCache.of(entity.getClass());
+        List<Object> pks = pkValues(meta, entity);
+        boolean exists = false;
+        if (pks.stream().allMatch(Objects::nonNull)) {
+            exists = queryById(connections, dialect, meta.getEntityClass(), pks.toArray()) != null;
+        }
+        if (exists) {
+            update(connections, dialect, entity);
+        } else {
+            insert(connections, dialect, entity);
+        }
+        return entity;
     }
 
     /** Selects one entity by primary key values (logic-delete filter applies). */

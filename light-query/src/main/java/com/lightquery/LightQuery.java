@@ -368,6 +368,11 @@ public final class LightQuery {
         primary().upsert(entity);
     }
 
+    /** Same as {@link LightQuerySession#saveOrUpdate(Object)} on the primary datasource. */
+    public static <T> T saveOrUpdate(T entity) {
+        return primary().saveOrUpdate(entity);
+    }
+
     /**
      * Runs {@code work} in one transaction on the primary datasource; the
      * session handed to {@code work} is bound to the transaction connection.

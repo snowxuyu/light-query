@@ -175,6 +175,15 @@ public final class LightQuerySession implements QueryExecutor {
         EntityOperations.upsert(connections, dialect, entity);
     }
 
+    /**
+     * Application-level save-or-update: checks existence by PK, then INSERT
+     * or UPDATE accordingly. For high-throughput prefer {@code upsert(entity)}
+     * (database-level ON DUPLICATE KEY / ON CONFLICT).
+     */
+    public <T> T saveOrUpdate(T entity) {
+        return EntityOperations.saveOrUpdate(connections, dialect, entity);
+    }
+
     // ------------------------------------------------------------------ transactions
 
     /**

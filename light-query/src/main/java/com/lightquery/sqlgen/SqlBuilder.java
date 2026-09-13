@@ -222,6 +222,20 @@ public final class SqlBuilder {
         sql.append(" FROM ").append(fromClause(model, scope, ctx, depth));
         sql.append(renderWhere(model.getWhere(), scope, ctx, depth));
 
+        // UNION / UNION ALL: render partner SELECTs after the current one
+        if (!model.getUnionPartners().isEmpty()) {
+            sql.append(model.isUnionAll() ? " UNION ALL " : " UNION ");
+            for (int u = 0; u < model.getUnionPartners().size(); u++) {
+                QueryModel partner = model.getUnionPartners().get(u);
+                if (u > 0) {
+                    sql.append(model.isUnionAll() ? " UNION ALL " : " UNION ");
+                }
+                SqlFragment partnerFragment = renderSelect(partner, dialect, scope, depth + 1, stripForCount);
+                sql.append(partnerFragment.sql());
+                ctx.params().addAll(partnerFragment.params());
+            }
+        }
+
         if (!stripForCount) {
             if (!model.getGroupBys().isEmpty()) {
                 sql.append(" GROUP BY ");

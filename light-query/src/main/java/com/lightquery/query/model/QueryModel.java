@@ -30,6 +30,8 @@ public final class QueryModel {
     private Long offset;
     private Long limit;
     private final List<String> excludedColumns = new ArrayList<>();
+    private final List<QueryModel> unionPartners = new ArrayList<>();
+    private boolean unionAll;
     private boolean forUpdate;
     private boolean usesSubQueries;
     /** Rendered as {@code SELECT 1} (used by the exists() terminal). */
@@ -224,6 +226,20 @@ public final class QueryModel {
     /** Column names excluded from the default SELECT list (root entity only). */
     public List<String> getExcludedColumns() {
         return excludedColumns;
+    }
+
+    /** QueryModels combined with UNION / UNION ALL after this one. */
+    public List<QueryModel> getUnionPartners() {
+        return unionPartners;
+    }
+
+    /** Whether UNION ALL (duplicates kept) instead of UNION (deduplicated). */
+    public boolean isUnionAll() {
+        return unionAll;
+    }
+
+    public void setUnionAll(boolean unionAll) {
+        this.unionAll = unionAll;
     }
 
     public boolean isExistsProbe() {
