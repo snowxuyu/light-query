@@ -91,8 +91,6 @@ public final class Where<T> {
     }
 
 
-        return this;
-    }
 
     /**
      * Appends a raw SQL fragment to the current group (escape hatch for dialect

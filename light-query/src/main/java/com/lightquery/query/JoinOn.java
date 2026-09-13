@@ -76,8 +76,7 @@ public final class JoinOn<A, B> {
     }
 
 
-        return this;
-    }
+    /** Applies {@code block} only when {@code condition} is true. */
 
     /**
      * Appends a raw SQL fragment to the ON clause (escape hatch for dialect

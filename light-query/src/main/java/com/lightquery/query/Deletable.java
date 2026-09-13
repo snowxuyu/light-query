@@ -119,8 +119,6 @@ public final class Deletable<T> {
     }
 
 
-        return this;
-    }
 
     /**
      * Appends a raw SQL fragment to the WHERE clause (escape hatch for dialect
