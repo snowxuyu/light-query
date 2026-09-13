@@ -48,7 +48,7 @@ class StrongTypingTest {
     void setUp() {
         h2 = new TestDb("strongtyping");
         LightQuery.insertBatch(List.of(
-                h2.user("frank", User.Status.ACTIVE, 30, "100.00", "team-a", 0),
+                h2.user("test-user", User.Status.ACTIVE, 30, "100.00", "team-a", 0),
                 h2.user("alice", User.Status.FROZEN, 22, "200.00", "team-b", 0)));
         LightQuery.insertBatch(List.of(
                 h2.order(1L, "50.00", 1),
@@ -58,7 +58,7 @@ class StrongTypingTest {
     @Test
     void equalityFamily() {
         assertEquals(1, LightQuery.queryable(User.class).col(User::getStatus).eq(User.Status.ACTIVE).count());
-        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).in("frank", "alice").count());
+        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).in("test-user", "alice").count());
     }
 
     @Test
@@ -67,9 +67,9 @@ class StrongTypingTest {
         assertEquals(2, LightQuery.queryable(User.class).col(User::getAge).between(20, 35).count());
         assertEquals(1, LightQuery.queryable(User.class)
                 .col(User::getBalance).gt(new BigDecimal("150")).count());
-        assertEquals(1, LightQuery.queryable(User.class).col(User::getName).like("frank").count());
+        assertEquals(1, LightQuery.queryable(User.class).col(User::getName).like("test-user").count());
         assertEquals(1, LightQuery.queryable(User.class).col(User::getName).startsWith("ali").count());
-        assertEquals(1, LightQuery.queryable(User.class).col(User::getName).endsWith("k").count());
+        assertEquals(1, LightQuery.queryable(User.class).col(User::getName).endsWith("user").count());
         // column-to-column via the typed handle
         assertEquals(2, LightQuery.queryable(User.class)
                 .leftJoin(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
@@ -106,7 +106,7 @@ class StrongTypingTest {
     void joinOnConstantFamilyIsTyped() {
         List<User> rows = LightQuery.queryable(User.class)
                 .innerJoin(Order.class, on -> on.col(Order::getStatus).eq(1))
-                .col(User::getName).eq("frank")
+                .col(User::getName).eq("test-user")
                 .toList();
         assertEquals(1, rows.size());
     }

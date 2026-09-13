@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  * <pre>{@code
  * List<User> users = LightQuery.queryable(User.class)
  *     .col(User::getStatus).eq(Status.ACTIVE)
- *     .and(w -> w.col(User::getName).like("frank").or().col(User::getAge).ge(18))
+ *     .and(w -> w.col(User::getName).like("test-user").or().col(User::getAge).ge(18))
  *     .orderByDesc(User::getCreateTime)
  *     .limit(10)
  *     .toList();

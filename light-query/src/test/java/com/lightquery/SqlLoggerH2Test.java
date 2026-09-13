@@ -44,7 +44,7 @@ class SqlLoggerH2Test {
             }
         });
         try {
-            LightQuery.queryable(User.class).col(User::getName).eq("frank").toList();
+            LightQuery.queryable(User.class).col(User::getName).eq("test-user").toList();
             assertEquals(2, events.size());
             assertTrue(events.get(0).startsWith("before:"), events.get(0));
             assertTrue(events.get(0).contains("t_user"));

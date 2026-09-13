@@ -26,8 +26,8 @@ class QueryH2Test {
     void setUp() {
         h2 = new TestDb("query");
         LightQuery.insertBatch(List.of(
-                h2.user("frank", User.Status.ACTIVE, 30, "100.00", "team-a", 0),
-                h2.user("frank%like", User.Status.ACTIVE, 40, "200.00", null, 0),
+                h2.user("test-user", User.Status.ACTIVE, 30, "100.00", "team-a", 0),
+                h2.user("test%user", User.Status.ACTIVE, 40, "200.00", null, 0),
                 h2.user("alice", User.Status.FROZEN, 22, null, "team-b", 0),
                 h2.user("bob", User.Status.ACTIVE, 17, "0.00", "team-a", 0)));
         LightQuery.insertBatch(List.of(
@@ -38,21 +38,21 @@ class QueryH2Test {
 
     @Test
     void likeEscapesUserWildcards() {
-        // the literal name "frank%like" must match exactly, not widen the pattern
-        List<User> rows = LightQuery.queryable(User.class).col(User::getName).like("frank%").toList();
+        // the literal name "test%user" must match exactly, not widen the pattern
+        List<User> rows = LightQuery.queryable(User.class).col(User::getName).like("test%").toList();
         assertEquals(1, rows.size());
-        assertEquals("frank%like", rows.get(0).getName());
+        assertEquals("test%user", rows.get(0).getName());
     }
 
     @Test
     void startsWithAndEndsWith() {
-        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).startsWith("frank").count());
-        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).endsWith("e").count());
+        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).startsWith("test").count());
+        assertEquals(1, LightQuery.queryable(User.class).col(User::getName).endsWith("e").count());
     }
 
     @Test
     void inAndBetween() {
-        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).in("frank", "alice").count());
+        assertEquals(2, LightQuery.queryable(User.class).col(User::getName).in("test-user", "alice").count());
         assertEquals(2, LightQuery.queryable(User.class).col(User::getAge).between(20, 35).count());
     }
 

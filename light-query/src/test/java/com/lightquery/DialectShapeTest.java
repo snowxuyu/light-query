@@ -69,7 +69,7 @@ class DialectShapeTest {
     void sqlServerEscapesLikeAndSupportsSequences() {
         String sql = LightQuery.primary(h2.dataSource).dialect(new SqlServerDialect())
                 .queryable(User.class)
-                .col(User::getName).like("frank")
+                .col(User::getName).like("test-user")
                 .toSql();
         assertTrue(sql.contains("ESCAPE '\\'"), sql);
         assertEquals("SELECT NEXT VALUE FOR [invoice_seq]",

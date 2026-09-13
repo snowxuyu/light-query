@@ -171,7 +171,7 @@ User user = LightQuery.queryById(User.class, 1L);
 ```java
 LightQuery.queryable(User.class)
     // ── 比较（null → IS NULL，非 null → = / <> / > / >= / < / <=）
-    .col(User::getName).eq("frank")
+    .col(User::getName).eq("test-user")
     .col(User::getName).ne("alice")
     .col(User::getAge).gt(18)
     .col(User::getAge).ge(18)
@@ -179,16 +179,16 @@ LightQuery.queryable(User.class)
     .col(User::getAge).le(60)
 
     // ── IN / NOT IN（空集合安全：空 IN → 1=0，空 NOT IN → 1=1）
-    .col(User::getName).in("frank", "alice")
-    .col(User::getName).in(List.of("frank", "alice"))
+    .col(User::getName).in("test-user", "alice")
+    .col(User::getName).in(List.of("test-user", "alice"))
     .col(User::getName).notIn(List.of("bob"))
 
     // ── BETWEEN（双闭区间）
     .col(User::getAge).between(18, 60)
 
     // ── LIKE（\ % _ 自动转义，两侧加 %）
-    .col(User::getName).like("frank")          // → LIKE '%frank%'
-    .col(User::getName).notLike("frank")
+    .col(User::getName).like("test-user")          // → LIKE '%test-user%'
+    .col(User::getName).notLike("test-user")
     .col(User::getName).startsWith("fra")      // → LIKE 'fra%'
     .col(User::getName).endsWith("ank")        // → LIKE '%ank'
 
@@ -209,8 +209,8 @@ LightQuery.queryable(User.class)
 
 List<User> users = LightQuery.queryable(User.class)
     .col(User::getStatus).eq(Status.ACTIVE)
-    .and(w -> w.col(User::getName).like("frank")
-              .or().col(User::getAge).ge(18))          // AND (name LIKE '%frank%' OR age >= 18)
+    .and(w -> w.col(User::getName).like("test-user")
+              .or().col(User::getAge).ge(18))          // AND (name LIKE '%test-user%' OR age >= 18)
     .or(w -> w.col(User::getStatus).eq(Status.FROZEN)) // OR (status = 'FROZEN')
     .toList();
 ```
@@ -236,7 +236,7 @@ List<User> rows = LightQuery.queryable(User.class)
 每个条件方法都有 **boolean 前置重载**——条件为 true 才追加，false 直接跳过：
 
 ```java
-String name = "frank";        // Web 请求参数，可能为 null
+String name = "test-user";        // Web 请求参数，可能为 null
 Integer minAge = null;        // 可能为 null
 Status status = Status.ACTIVE;
 
@@ -245,7 +245,7 @@ List<User> rows = LightQuery.queryable(User.class)
     .col(User::getAge).ge(minAge != null, minAge)
     .col(User::getStatus).eq(status != null, status)
     .toList();
-// 只拼有值的条件：WHERE user_name LIKE '%frank%' AND status = 'ACTIVE'
+// 只拼有值的条件：WHERE user_name LIKE '%test-user%' AND status = 'ACTIVE'
 ```
 
 也可以用 `.when()` 做更复杂的条件判断（多个条件一起控制）：
@@ -430,7 +430,7 @@ LightQuery.queryable(User.class)
 ```java
 // 单条插入（IDENTITY 主键自动回填）
 User user = new User();
-user.setName("frank");
+user.setName("test-user");
 user.setStatus(Status.ACTIVE);
 LightQuery.insert(user);
 System.out.println(user.getId());  // 自增主键已回填

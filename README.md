@@ -63,7 +63,7 @@ LightQuery.primary(dataSource);       // 方言从 JDBC URL 自动探测
 // 查询
 List<User> users = LightQuery.queryable(User.class)
     .col(User::getStatus).eq(Status.ACTIVE)
-    .and(w -> w.col(User::getName).like("frank").or().col(User::getAge).ge(18))
+    .and(w -> w.col(User::getName).like("test-user").or().col(User::getAge).ge(18))
     .orderByDesc(User::getId)
     .limit(10)
     .toList();
@@ -111,7 +111,7 @@ LightQuery.queryable(User.class)
     .col(User::getName).in(List.of("a", "b"))     // 空集合 → 1 = 0（防全表事故）
     .col(User::getName).notIn(List.of())          // 空 NOT IN → 1 = 1
     .col(User::getAge).between(18, 60)            // 比较族：gt/ge/lt/le/between/notBetween
-    .col(User::getName).like("frank")             // \ % _ 自动转义，两侧加 %
+    .col(User::getName).like("test-user")             // \ % _ 自动转义，两侧加 %
     .col(User::getRemark).isNull()
     .and(w -> w.col(User::getAge).ge(18).or().col(User::getAge).lt(12))
     .toList();

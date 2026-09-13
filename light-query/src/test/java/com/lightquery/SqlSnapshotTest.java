@@ -31,10 +31,10 @@ class SqlSnapshotTest {
     @Test
     void simpleWhereWithLogicDeleteFilter() {
         String sql = db.queryable(User.class)
-                .col(User::getName).eq("frank")
+                .col(User::getName).eq("test-user")
                 .toSql();
         assertEquals("SELECT * FROM `t_user` WHERE `user_name` = ? AND `deleted` = ?"
-                + " | params=[frank, 0]", sql);
+                + " | params=[test-user, 0]", sql);
     }
 
     @Test

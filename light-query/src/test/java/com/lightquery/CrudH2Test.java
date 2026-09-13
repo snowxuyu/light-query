@@ -29,14 +29,14 @@ class CrudH2Test {
 
     @Test
     void insertBackfillsIdentityKey() {
-        User user = h2.user("frank", User.Status.ACTIVE, 30, "100.50", "ok", 0);
+        User user = h2.user("test-user", User.Status.ACTIVE, 30, "100.50", "ok", 0);
         User returned = LightQuery.insert(user);
         assertNotNull(user.getId());
         assertEquals(user.getId(), returned.getId());
 
         User loaded = LightQuery.queryById(User.class, user.getId());
         assertNotNull(loaded);
-        assertEquals("frank", loaded.getName());
+        assertEquals("test-user", loaded.getName());
         assertEquals(User.Status.ACTIVE, loaded.getStatus());
         assertEquals(new BigDecimal("100.50"), loaded.getBalance());
         assertNull(loaded.getIgnored()); // @Transient never mapped
