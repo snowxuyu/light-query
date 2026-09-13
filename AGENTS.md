@@ -53,6 +53,10 @@ mvn test          # 仅测试
 
 ## 发布与 CI
 
+- **版本策略（用户固定要求）**：每合入一批新特性就发一版——小版本 +1
+  （如 0.4.0 → 0.5.0），按 `docs/RELEASE.md` 收口后提交推送 main，
+  打 `v0.{n}.0` tag 并推送，`release.yml` 自动发布 Maven Central；
+  发布后确认 Actions success 与 Central 可见。
 - `build.yml`：push/PR 自动 `mvn verify`。
 - `release.yml`：打 `v*` tag 触发发布，前置条件见 `docs/RELEASE.md`
   （Central Portal secrets：`MAVEN_CENTRAL_USER/TOKEN`、`GPG_PRIVATE_KEY`、`GPG_PASSPHRASE`）。
