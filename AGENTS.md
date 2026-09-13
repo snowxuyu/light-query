@@ -23,7 +23,7 @@ light-query：面向 Java 21 的低学习成本、类型安全轻量 ORM。
 
 ```bash
 # 需要 JDK 21
-mvn verify        # 全量构建 + 199 个测试（T1-T28 矩阵）
+mvn verify        # 全量构建 + 215 个测试（T1-T30 矩阵）
 mvn test          # 仅测试
 ```
 

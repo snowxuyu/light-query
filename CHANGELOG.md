@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-13
+
+### Added
+- **Global type conversion SPI** (`ValueConverter<A, D>`):
+  `LightQuery.registerConverter(Money.class, converter)` applies on the full
+  entity path — writes, condition bind values, result mapping — mirroring JPA
+  `@Convert`. Matching is by exact declared type; a field-level `@Convert`
+  takes precedence; null passes through untouched; duplicate registration for
+  a type throws; converter failures are wrapped in `MappingException` naming
+  the column and property. Test matrix T29 (`ConverterRegistryH2Test`).
+- **Condition composition API** (`com.lightquery.query.Conditions` /
+  `Condition` / `TypedCondition`): build strongly-typed condition trees
+  offline — `Conditions.col(User::getStatus).eq(ACTIVE)` — combine with
+  `and` / `or` / `not`, and attach the immutable tree to any builder via
+  `where(spec)` on `Queryable` / `Updatable` / `Deletable` / `Where` /
+  `JoinOn`. The same spec attaches to any number of queries; column
+  references resolve against the host query's scope at render time (joins and
+  self-join `TableColumn`s included); sub-queries in a spec trigger alias
+  rendering on the host; boolean-first overloads compose skipped conditions
+  as nothing. SQL output for existing queries is unchanged. Test matrix T30
+  (`ConditionCompositionH2Test`).
+- `FillListener.onWrite(Operation, entity)`: summary callback after
+  `onInsert`/`onUpdate` reporting the write kind (INSERT / UPDATE / UPSERT;
+  a null-PK upsert degenerates to INSERT). Default no-op, so existing
+  listeners are unaffected. Test matrix T15.
+
 ## [0.4.2] — 2026-09-13
 
 ### Fixed

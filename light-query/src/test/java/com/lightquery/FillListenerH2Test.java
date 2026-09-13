@@ -113,4 +113,48 @@ class FillListenerH2Test {
             LightQuery.clearFillListener();
         }
     }
+
+    @Test
+    void onWriteReportsOperationType() {
+        List<String> ops = new java.util.ArrayList<>();
+        LightQuery.setFillListener(new FillListener() {
+            @Override
+            public void onInsert(Object entity) { ops.add("onInsert"); }
+            @Override
+            public void onUpdate(Object entity) { ops.add("onUpdate"); }
+            @Override
+            public void onWrite(Operation op, Object entity) { ops.add("onWrite:" + op); }
+        });
+        try {
+            User user = LightQuery.insert(h2.user("op-insert", User.Status.ACTIVE, 1, null, null, 0));
+            user.setName("op-insert-renamed");
+            LightQuery.update(user);
+            User upserted = h2.user("op-upsert", User.Status.ACTIVE, 2, null, null, 0);
+            upserted.setId(501L);
+            LightQuery.upsert(upserted);
+
+            assertEquals(List.of(
+                    "onInsert", "onWrite:INSERT",
+                    "onUpdate", "onWrite:UPDATE",
+                    "onInsert", "onUpdate", "onWrite:UPSERT"), ops);
+        } finally {
+            LightQuery.clearFillListener();
+        }
+    }
+
+    @Test
+    void nullPkUpsertReportsInsertOperation() {
+        List<String> ops = new java.util.ArrayList<>();
+        LightQuery.setFillListener(new FillListener() {
+            @Override
+            public void onWrite(Operation op, Object entity) { ops.add(op.name()); }
+        });
+        try {
+            LightQuery.upsert(h2.user("op-degenerate", User.Status.ACTIVE, 1, null, null, 0));
+            // null primary key -> upsert degenerates to a plain insert
+            assertEquals(List.of("INSERT"), ops);
+        } finally {
+            LightQuery.clearFillListener();
+        }
+    }
 }

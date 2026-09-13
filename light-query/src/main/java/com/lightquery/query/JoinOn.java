@@ -88,6 +88,19 @@ public final class JoinOn<A, B> {
         return this;
     }
 
+    /**
+     * Attaches an offline condition tree (see {@link Conditions}) to the ON
+     * clause — one subtree ANDed with the other ON conditions. Columns
+     * resolve against both joined entities.
+     */
+    public JoinOn<A, B> where(com.lightquery.query.Condition spec) {
+        if (spec.usesSubQueries()) {
+            onSubQuery.run();
+        }
+        group.add(spec.group());
+        return this;
+    }
+
     /** Switches the connector of the next added condition to OR. */
     public JoinOn<A, B> or() {
         group.or();

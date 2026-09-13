@@ -16,6 +16,7 @@ public final class ConditionGroup {
 
     private final List<Node> children = new ArrayList<>();
     private boolean pendingOr;
+    private boolean negated;
 
     public List<Node> getChildren() {
         return children;
@@ -34,5 +35,18 @@ public final class ConditionGroup {
 
     public boolean isEmpty() {
         return children.isEmpty();
+    }
+
+    /**
+     * Marks this group as negated — rendered as {@code NOT (...)}. Internal
+     * seam for the {@code Condition} composition API; a negated empty group
+     * still renders as nothing.
+     */
+    public void negate() {
+        this.negated = true;
+    }
+
+    public boolean isNegated() {
+        return negated;
     }
 }

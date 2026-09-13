@@ -359,7 +359,7 @@ public final class SqlBuilder {
             }
             out.append(rendered);
         }
-        return out.toString();
+        return group.isNegated() && !out.isEmpty() ? "NOT " + parenthesize(out.toString()) : out.toString();
     }
 
     private static String parenthesize(String sql) {

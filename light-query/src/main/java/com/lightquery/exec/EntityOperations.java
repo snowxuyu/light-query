@@ -1,6 +1,7 @@
 package com.lightquery.exec;
 
 import com.lightquery.FillListener;
+import com.lightquery.Operation;
 import com.lightquery.exception.MappingException;
 import com.lightquery.exception.SqlBuildException;
 import com.lightquery.exception.UnexpectedRowsException;
@@ -40,6 +41,7 @@ public final class EntityOperations {
         FillListener listener = FillListeners.current();
         if (listener != null) {
             listener.onInsert(entity);
+            listener.onWrite(Operation.INSERT, entity);
         }
         fetchSequenceKey(connections, dialect, meta, entity);
         initInsertVersion(meta, entity);
@@ -75,6 +77,7 @@ public final class EntityOperations {
         for (E entity : entities) {
             if (listener != null) {
                 listener.onInsert(entity);
+                listener.onWrite(Operation.INSERT, entity);
             }
             if (sequencePk != null) {
                 fetchSequenceKey(connections, dialect, meta, entity);
@@ -180,6 +183,7 @@ public final class EntityOperations {
         if (listener != null) {
             listener.onInsert(entity);
             listener.onUpdate(entity);
+            listener.onWrite(Operation.UPSERT, entity);
         }
         // identity PKs are normally generated and stay out of the column list;
         // with a non-null value they must join the statement so the conflict
@@ -250,6 +254,7 @@ public final class EntityOperations {
         FillListener listener = FillListeners.current();
         if (listener != null) {
             listener.onUpdate(entity);
+            listener.onWrite(Operation.UPDATE, entity);
         }
         List<Object> pks = nonNullPkValues(meta, entity);
         ColumnMeta version = meta.getVersionColumn();

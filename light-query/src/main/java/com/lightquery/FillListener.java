@@ -35,4 +35,15 @@ public interface FillListener {
     /** Called once per entity before its UPDATE is built. */
     default void onUpdate(Object entity) {
     }
+
+    /**
+     * Summary callback fired after {@code onInsert}/{@code onUpdate} for
+     * every entity-level write (0.5.0): {@code op} is {@code INSERT},
+     * {@code UPDATE} or {@code UPSERT}. The upsert path reports UPSERT only
+     * when all primary-key values are non-null — otherwise it degenerates to
+     * a plain insert and reports INSERT. Default is empty, so existing
+     * listeners are unaffected.
+     */
+    default void onWrite(Operation op, Object entity) {
+    }
 }

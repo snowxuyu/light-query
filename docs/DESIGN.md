@@ -473,6 +473,11 @@ public interface FillListener {
 - fluent `Updatable/Deletable` 与 `delete/deleteById` 不回调；监听器抛出的异常原样传播（并使当前
   操作失败，事务语义不变）。
 
+`onWrite(Operation, entity)`（0.5.0）：`onInsert`/`onUpdate` 回调之后追加的
+汇总回调，`Operation ∈ {INSERT, UPDATE, UPSERT}`（upsert 的空主键路径退化为
+insert，回调 INSERT）。默认空实现，不影响既有监听器；异常传播语义与
+onInsert/onUpdate 相同。
+
 ### 5.11 spring-boot-starter（`light-query-spring-boot-starter`）
 
 ```xml
@@ -669,6 +674,63 @@ LightQuery.queryable(User.class).col(User::getStatus).eq(ACTIVE)
   实体全列减 exclude 计数，双方均含各自口径）。
 - partner 可继续 union 形成链；各侧独立渲染自身逻辑删除过滤。
 
+### 5.20 全局类型转换：`ValueConverter` SPI（0.5.0）
+
+```java
+public interface ValueConverter<A, D> {
+    D toDatabase(A attribute);
+    A fromDatabase(D dbValue);
+}
+
+LightQuery.registerConverter(Money.class, new MoneyConverter());  // 启动期全局注册
+LightQuery.clearConverters();                                     // 测试用
+```
+
+契约（测试固化，见 T29）：
+
+- **匹配粒度：精确类型**。注册类型的 `Class` 与实体字段声明类型 `==` 相等才命中；
+  不做子类 assignable 匹配（`registerConverter(Number.class)` 不影响 Long 列）。
+- **优先级**：字段级 JPA `@Convert` > 全局注册 > 默认 JDBC 映射。
+- **生效链路**：与 `@Convert` 同路径——`ColumnMeta.toDbValue / fromDbValue`，
+  即 insert/update/upsert、条件绑定值、结果映射全部生效；投影（record/VO）
+  不经过 ColumnMeta，不生效（与 `@Convert` 一致）。
+- **null 直通**：全局转换器只在值非 null 时调用（`@Convert` 行为不变，
+  由转换器自行处理 null）。
+- **重复注册同一类型抛 IllegalStateException**（消息指出已注册与修复方式：
+  先 `clearConverters()`）。
+- 转换器抛异常包装为 `MappingException`（消息含字段与类型）。
+
+### 5.21 条件组合：`Condition` 一等公民（0.5.0）
+
+```java
+import static com.lightquery.Conditions.col;
+
+Condition active  = col(User::getStatus).eq(ACTIVE);
+Condition grownUp = col(User::getAge).ge(18);
+Condition spec = active.and(grownUp.or(col(User::getName).like("a%"))).not();
+
+LightQuery.queryable(User.class).where(spec).toList();     // 可复用、可组合
+LightQuery.updatable(User.class).where(spec).execute();
+LightQuery.deletable(User.class).where(spec).execute();
+// Where / JoinOn 分组内同款：w.where(spec)
+```
+
+契约（测试固化，见 T30）：
+
+- `Conditions.col(lambda)` 产出**离线强类型条件柄** `TypedCondition<V>`，
+  其条件终端（与 `TypedColumn` 同一族：相等/比较/IN/BETWEEN/文本/列对列/子查询/
+  boolean 前置重载）返回不可变的 `com.lightquery.Condition`。
+- **列引用在渲染期经作用域链解析**：离线 ColumnRef 只带实体+列名，挂到查询后
+  由该查询解析表别名（含 join 表）；实体不在作用域 → 既有「did you forget to join」
+  报错。自连接用 `Conditions.col(TableColumn)`。
+- `and/or` 组合为新的不可变节点；`not()` 输出 `NOT (...)`（ConditionGroup 新增
+  否定标记，渲染层支持）。同一 spec 挂多个查询互不影响（构建后不可变）。
+- 挂载点：`Queryable/Updatable/Deletable/Where/JoinOn` 的 `where(Condition)`，
+  spec 整体作为最外层 AND 组的一个子树；含子查询的 spec 挂载时对宿主模型
+  `markUsesSubQueries`（别名渲染不变）。
+- 逻辑删除过滤、既有 `Consumer<Where>` 入口全部不变。
+- **SQL 字符串零变化**为放行线：不用组合 API 的既有查询快照不动。
+
 ---
 ## 6. SQL 生成规则（SqlBuilder + Dialect）
 
@@ -800,7 +862,7 @@ unchecked）——不新增自定义异常类型。
 | T12 | OptimisticLockH2Test | `@Version`：insert 版本初始化、update 追加版本校验并自增（回填新版本）、updateSelective、delete（含逻辑删除转 UPDATE）、版本冲突抛 OptimisticLockException、非法版本类型/多 @Version 启动报错 |
 | T13 | SequenceH2Test | SEQUENCE 主键：nextval 回填后随 INSERT 写入、insertBatch 逐实体取值、方言 SQL 形态（PG nextval / H2 NEXT VALUE FOR）、MySQL 不支持报错、缺 @SequenceGenerator 启动报错 |
 | T14 | SelfJoinH2Test | 自连接：同实体多次 join 显式别名、TableColumn 条件/投影/排序、未注册 occurrence 报错、重复实体 lambda 条件报错（提示 TableColumn）、重复别名/保留别名拒绝、逻辑删过滤只在根表 |
-| T15 | FillListenerH2Test | 填充 SPI：insert/update 回调、批量逐实体回调、未注册时无副作用、监听器异常原样传播 |
+| T15 | FillListenerH2Test | 填充 SPI：insert/update 回调、批量逐实体回调、未注册时无副作用、监听器异常原样传播、onWrite(INSERT/UPDATE/UPSERT) 汇总回调（0.5.0） |
 | T16 | SpringStarterTest | starter：自动装配 LightQuerySession Bean + 门面主库注册、Spring 事务内语句复用绑定连接（rollback 生效）、无事务时逐操作连接、自定义 Bean 跳过自动装配 |
 | T17 | ProjectionH2Test | VO/record 投影：全列按名匹配（含下划线/大小写归一）、聚合别名、POJO setter、枚举与数值转换、分页投影、缺组件列报错（列出可用标签） |
 | T18 | SeekPaginationH2Test | seek 分页：单列/多列混合方向遍历不重不漏、与用户条件 AND、无 orderBy / 值个数不符 / null 值报错 |
@@ -812,6 +874,8 @@ unchecked）——不新增自定义异常类型。
 | T24 | ExcludeH2Test | `exclude()`：单表 SELECT * 变显式列清单（不含排除列）、join 查询下同样生效 |
 | T25 | SqlLoggerH2Test | `SqlLogger` SPI：beforeExecute/afterExecute 回调（SQL、参数、耗时）及先后顺序、onError 在 SQL 异常时触发、未注册 logger 无副作用 |
 | T28 | LightQueryLoggersTest | SLF4J 适配器：三个回调的日志级别与内容（注入桩 Logger 断言）、无状态可复用 |
+| T29 | ConverterRegistryH2Test | `ValueConverter` 全局注册：写入/读出往返、条件绑定值转换、`@Convert` 字段级优先、null 直通、重复注册抛 IllegalStateException、精确类型匹配（父类注册不命中）、转换器异常包装、clearConverters |
+| T30 | ConditionCompositionH2Test | 离线条件组合：and/or/not 嵌套渲染与 H2 行为、同一 spec 挂多查询互不影响、与内联条件混用、join 列解析、Updatable/Deletable/Where/JoinOn 挂载、子查询 spec 触发别名渲染、boolean 前置重载、自连接 TableColumn 列 |
 | T26 | RawSqlH2Test | raw 逃生舱（§5.16）：sqlHint 渲染位置、selectRaw 别名与 Tuple label、whereRaw `?` 绑定与 AND 组合、groupByRaw 分组正确、orderByRaw 原样无方向后缀 |
 | T27 | UnionAndSaveOrUpdateTest | `union` 去重合并、`unionAll` 保留重复行、`saveOrUpdate` 按主键是否为空分流 insert/update、partner 带 orderBy/limit 拒绝与列数不符拒绝（0.4.1 fail-fast） |
 
@@ -881,18 +945,18 @@ light-query-parent/
 |---|---|
 | 0.1.0 | 实体映射（JPA 注解）/ lambda 条件 / join / 子查询 / 聚合 / 逻辑删除 / 事务 / 方言 |
 | 0.2.0 | 静态门面 + 多数据源 / `@Version` 乐观锁 / SEQUENCE 主键 / 自连接（QueryTable）/ FillListener SPI / Spring Boot Starter |
+| 0.5.0 | `ValueConverter` 全局类型转换 SPI（精确类型匹配）/ 条件组合 API（`Conditions.col(...)` + `Condition.and/or/not` + 五处挂载点）/ `FillListener.onWrite` 汇总回调 |
 | 0.4.1 | `SqlLogger` 的 SLF4J 适配器（optional 依赖）/ upsert 补齐 FillListener 契约 / union partner fail-fast 校验 |
 | 0.4.0 | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 / update join·delete join / exclude() / raw SQL 逃生舱（sqlHint/selectRaw/whereRaw/groupByRaw/orderByRaw）/ `SqlLogger` SPI / JPA `@Convert` / upsert + `insertBatch(batchSize)` / UNION·UNION ALL / saveOrUpdate / boolean 前置条件重载（删除 when()）|
 
-### 0.5.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
+### 0.6.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
 
 | 特性 | 动机 | 说明 |
 |---|---|---|
-| 自定义类型处理器 | MP `TypeHandler`，jOOQ Converter | JPA `AttributeConverter` 已透传（T22）；补自定义 `ValueConverter<V, D>` SPI |
-| 条件复用与组合 | jOOQ `Condition.and/or` 可组合 | `TypedColumn` 产物可缓存、跨查询复用（`ConditionGroup` 已是树，暴露组合 API）|
-| 审计拦截器 SPI | MP `MetaObjectHandler` / JPA `@PrePersist` | 操作类型 + 实体快照 + 时间戳，行级 before/after 钩子 |
+| 条件组合增强 | jOOQ 完整 DSL | 0.5.0 已落地 `and/or/not` 组合（T30）；按需补集合运算、exists 组合形态 |
+| 审计 after 钩子 | MP `MetaObjectHandler` | 行级 after 语义在 JDBC 批量下不稳定，待真实需求再评估 |
 
-### 0.6.0+ 规划（中远期）
+### 0.7.0+ 规划（中远期）
 
 | 特性 | 动机 | 说明 |
 |---|---|---|

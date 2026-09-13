@@ -1,6 +1,7 @@
 package com.lightquery;
 
 import com.lightquery.exec.ConnectionProvider;
+import com.lightquery.meta.Converters;
 import com.lightquery.exec.FillListeners;
 import com.lightquery.exec.SqlLoggers;
 import com.lightquery.exception.LightQueryException;
@@ -242,6 +243,27 @@ public final class LightQuery {
     /** Removes the global {@link FillListener}. */
     public static void clearFillListener() {
         FillListeners.clear();
+    }
+
+    /**
+     * Registers a global {@link ValueConverter} for the exact attribute
+     * type: conversions then apply on the full entity path (writes, condition
+     * bind values, result mapping), exactly like a JPA {@code @Convert} —
+     * except a field-level {@code @Convert} takes precedence. Matching is by
+     * exact declared type only; converters are invoked for non-null values.
+     *
+     * @param attributeType the entity property's declared type, e.g. {@code Money.class}
+     * @param converter the converter for that type
+     * @throws IllegalStateException when a converter is already registered
+     *         for this type — call {@link #clearConverters()} first
+     */
+    public static void registerConverter(Class<?> attributeType, ValueConverter<?, ?> converter) {
+        Converters.register(attributeType, converter);
+    }
+
+    /** Removes every globally registered {@link ValueConverter}. */
+    public static void clearConverters() {
+        Converters.clear();
     }
 
     /**

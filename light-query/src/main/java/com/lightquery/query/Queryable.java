@@ -181,6 +181,17 @@ public final class Queryable<T> {
     }
 
     /**
+     * Attaches an offline condition tree (see {@link Conditions}) to this
+     * query. The spec composes as one subtree ANDed into the WHERE tree;
+     * the same spec instance can be attached to any number of queries.
+     */
+    public Queryable<T> where(com.lightquery.query.Condition spec) {
+        ensureOpen();
+        where.where(spec);
+        return this;
+    }
+
+    /**
      * Combines this query with another using UNION (deduplicates rows).
      * Both queries must select the same number of columns.
      *

@@ -104,6 +104,19 @@ public final class Where<T> {
         return this;
     }
 
+    /**
+     * Attaches an offline condition tree (see {@link Conditions}) to this
+     * group — one subtree ANDed with the group's other conditions. The same
+     * spec instance can be attached to any number of queries or groups.
+     */
+    public Where<T> where(com.lightquery.query.Condition spec) {
+        if (spec.usesSubQueries()) {
+            onSubQuery.run();
+        }
+        group.add(spec.group());
+        return this;
+    }
+
     // ------------------------------------------------------------------ grouping & connectors
 
     /** Switches the connector of the next added condition to OR. */
@@ -151,6 +164,11 @@ public final class Where<T> {
     }
 
     ConditionGroup group() {
+        return group;
+    }
+
+    /** Package seam for spec attachment. */
+    ConditionGroup rawGroup() {
         return group;
     }
 }

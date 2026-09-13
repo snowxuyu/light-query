@@ -440,6 +440,28 @@ active.union(frozen).toList();      // 去重
 active.unionAll(frozen).toList();   // 保留重复行
 ```
 
+### 5.16 条件组合（离线构建、跨查询复用）
+
+`Conditions.col(...)` 在查询之外构建强类型条件树，组合后挂到任意查询：
+
+```java
+import static com.lightquery.query.Conditions.col;
+
+Condition active  = col(User::getStatus).eq(Status.ACTIVE);
+Condition grownUp = col(User::getAge).ge(18);
+Condition spec = active.and(grownUp.or(col(User::getName).like("aro"))).not();
+
+LightQuery.queryable(User.class).where(spec).toList();   // 查询用
+LightQuery.updatable(User.class).where(spec).execute();  // 更新也用
+LightQuery.deletable(User.class).where(spec).execute();  // 删除也用
+```
+
+- 终端方法与 `col()` 一致（相等/比较/IN/BETWEEN/文本/列对列/子查询），每个终端
+  返回不可变的 `Condition`；`and/or/not` 组合成新树，同一 spec 可挂任意多个查询。
+- 条件里的列在渲染期按宿主查询解析（join 表、自连接 `TableColumn` 都支持）。
+- boolean 前置重载同样可用：被跳过的条件组合为空，不进 SQL。
+- `Conditions.raw("...", args)` 可把原样片段纳入组合树。
+
 ---
 
 ## 6. 写入
@@ -679,6 +701,9 @@ LightQuery.setFillListener(new FillListener() {
 
 ---
 
+**操作类型回调（0.5.0）**：`onWrite(Operation, entity)` 在 onInsert/onUpdate
+之后触发，`Operation` 为 INSERT / UPDATE / UPSERT（upsert 空主键退化为 insert）。
+
 ## 12. 类型转换（@Convert）
 
 ```java
@@ -701,6 +726,17 @@ private Money amount;
 ```
 
 ---
+
+**全局类型转换（0.5.0）**：同一 Java 类型到处使用时，注册一次全局转换器，
+不必逐字段写 `@Convert`：
+
+```java
+LightQuery.registerConverter(Money.class, new MoneyConverter());
+// 写库 / 条件绑定 / 读映射全链路生效；字段级 @Convert 优先于全局注册
+LightQuery.clearConverters();   // 清空
+```
+
+匹配为**精确类型**（不做子类匹配）；null 直通；重复注册报错。
 
 ## 13. SQL 日志
 

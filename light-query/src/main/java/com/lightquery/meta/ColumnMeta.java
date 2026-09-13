@@ -1,5 +1,6 @@
 package com.lightquery.meta;
 
+import com.lightquery.ValueConverter;
 import com.lightquery.exception.MappingException;
 import jakarta.persistence.AttributeConverter;
 
@@ -184,8 +185,15 @@ public final class ColumnMeta {
 
     /** Converts an entity property value into the value bound to JDBC. */
     public Object toDbValue(Object value) {
-        if (converter != null && value != null) {
-            value = converter.convertToDatabaseColumn(value);
+        if (value != null) {
+            if (converter != null) {
+                value = convertByFieldConverterToDb(value);
+            } else {
+                ValueConverter<Object, Object> global = Converters.forType(field.getType());
+                if (global != null) {
+                    value = convertByGlobalToDb(global, value);
+                }
+            }
         }
         if (value == null || enumKind == EnumKind.NONE) {
             return value;
@@ -199,12 +207,38 @@ public final class ColumnMeta {
         if (converter != null) {
             return converter.convertToEntityAttribute(value);
         }
+        if (value != null) {
+            ValueConverter<Object, Object> global = Converters.forType(field.getType());
+            if (global != null) {
+                return global.fromDatabase(value);
+            }
+        }
         if (value == null || enumKind == EnumKind.NONE) {
             return value;
         }
         return enumKind == EnumKind.STRING
                 ? enumFromName(value.toString())
                 : enumFromOrdinal(((Number) value).intValue());
+    }
+
+    private Object convertByFieldConverterToDb(Object value) {
+        try {
+            return converter.convertToDatabaseColumn(value);
+        } catch (RuntimeException e) {
+            throw new MappingException("Converter " + converter.getClass().getSimpleName()
+                    + " failed for column '" + columnName + "' (property '" + propertyName
+                    + "') on value " + value, e);
+        }
+    }
+
+    private Object convertByGlobalToDb(ValueConverter<Object, Object> global, Object value) {
+        try {
+            return global.toDatabase(value);
+        } catch (RuntimeException e) {
+            throw new MappingException("ValueConverter " + global.getClass().getSimpleName()
+                    + " failed for column '" + columnName + "' (property '" + propertyName
+                    + "') on value " + value, e);
+        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

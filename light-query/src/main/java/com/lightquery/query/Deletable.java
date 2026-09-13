@@ -133,6 +133,20 @@ public final class Deletable<T> {
         return this;
     }
 
+    /**
+     * Attaches an offline condition tree (see {@link Conditions}) — one
+     * subtree ANDed into the WHERE clause. Columns resolve against the
+     * deleted entity and its joined tables.
+     */
+    public Deletable<T> where(com.lightquery.query.Condition spec) {
+        ensureOpen();
+        if (spec.usesSubQueries()) {
+            model.markUsesSubQueries();
+        }
+        model.getWhere().add(spec.group());
+        return this;
+    }
+
     /** Adds a parenthesised AND group. */
     public Deletable<T> and(Consumer<Where<T>> group) {
         ensureOpen();

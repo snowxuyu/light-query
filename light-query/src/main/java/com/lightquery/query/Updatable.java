@@ -174,6 +174,20 @@ public final class Updatable<T> {
         return this;
     }
 
+    /**
+     * Attaches an offline condition tree (see {@link Conditions}) — one
+     * subtree ANDed into the WHERE clause. Columns resolve against the
+     * updated entity and its joined tables.
+     */
+    public Updatable<T> where(com.lightquery.query.Condition spec) {
+        ensureOpen();
+        if (spec.usesSubQueries()) {
+            model.markUsesSubQueries();
+        }
+        model.getWhere().add(spec.group());
+        return this;
+    }
+
     /** Adds a parenthesised AND group. */
     public Updatable<T> and(Consumer<Where<T>> group) {
         ensureOpen();
