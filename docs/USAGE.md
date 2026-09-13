@@ -487,7 +487,20 @@ LightQuery.updatable(User.class)
     .allowFullTable()
     .col(User::getStatus).set(Status.ACTIVE)
     .execute();
+
+// 关联更新（update join）：冻结有大额订单的用户
+// MySQL: UPDATE t_user t0, t_order t1 SET ... WHERE ...
+// PostgreSQL / SQL Server: UPDATE ... FROM ...
+LightQuery.updatable(User.class)
+    .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+    .col(User::getStatus).set(User.Status.FROZEN)
+    .col(Order::getAmount).gt(new BigDecimal("10000"))  // join 表列只能用于 WHERE 过滤
+    .execute();
 ```
+
+- SET 只能改主表列（对 join 表的列 `set` 运行时报错）；`setFrom(entity)` 可从同类型实体整体取值。
+- 逻辑删除实体自动转为 UPDATE join（写 `deleted = 1`）。
+- Oracle / H2 不支持 update join，直接报错并提示改用 IN 子查询。
 
 ### 6.3 删除
 
@@ -513,7 +526,19 @@ LightQuery.deletable(User.class)
 LightQuery.deletable(User.class)
     .allowFullTable()
     .execute();
+
+// 关联删除（delete join）：物理删除小额订单所属用户
+// MySQL: DELETE t0 FROM t_user t0, t_order t1 WHERE ...
+// PostgreSQL / SQL Server: DELETE ... USING / FROM ...
+LightQuery.deletable(User.class)
+    .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId))
+    .col(Order::getAmount).lt(new BigDecimal("1"))
+    .physical()
+    .execute();
 ```
+
+- join 表列只能用于 WHERE 过滤；逻辑删除实体默认转 UPDATE join，`physical()` 才是真 DELETE join。
+- Oracle / H2 不支持 delete join，直接报错并提示改用 IN 子查询。
 
 ### 6.4 upsert 与 saveOrUpdate
 
@@ -781,7 +806,10 @@ LightQuery.setSqlLogger(new SqlLogger() {
 - 自动填充：`FillListener` SPI
 - 类型转换：JPA `@Convert` / `AttributeConverter`
 - SQL 日志：`SqlLogger` SPI
-- upsert：MySQL / PG
+- upsert：MySQL（`ON DUPLICATE KEY`）/ PG、H2（`ON CONFLICT`）
+- 关联写入：update join / delete join（MySQL / PG / SQL Server；Oracle、H2 报错并提示 IN 子查询）
+- raw SQL：`sqlHint` / `selectRaw` / `whereRaw` / `groupByRaw` / `orderByRaw` 逃生舱
+- 集合运算：`union` / `unionAll`；`saveOrUpdate` 按主键分流
 
 ## License
 
