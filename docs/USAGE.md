@@ -24,7 +24,7 @@ light-query 是一个轻量级 Java ORM：
 <dependency>
     <groupId>io.github.snowxuyu</groupId>
     <artifactId>light-query</artifactId>
-    <version>0.2.0</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 
@@ -34,7 +34,7 @@ Spring Boot 项目加 starter（自动装配 + 事务对接）：
 <dependency>
     <groupId>io.github.snowxuyu</groupId>
     <artifactId>light-query-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 

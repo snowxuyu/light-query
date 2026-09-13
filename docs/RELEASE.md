@@ -28,7 +28,7 @@
 # 2. 版本收口（小版本 +1）：parent + light-query + starter 三个 pom 的
 #    version，以及 README 两处依赖示例版本号，统一改为 0.{n}.0
 # 3. 本地干跑：mvn -Prelease -Dgpg.skip=true verify
-#    （178+ 测试全绿，jar/sources/javadoc 四件套齐全）
+#    （全量测试绿，二进制/sources/javadoc 四件套齐全）
 # 4. 提交 "release: v0.{n}.0" 并推送 main
 # 5. 打 tag 并推送，触发 release.yml 自动发布 Maven Central：
 git tag v0.{n}.0 && git push origin v0.{n}.0

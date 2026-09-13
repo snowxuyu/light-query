@@ -2,7 +2,7 @@
 
 > 本文档是 LightQuery 的**完整实施方案**，代码实现必须与本文档一致。
 > 任何偏离文档的实现视为 bug；任何文档变更需先改本文档再改代码。
-> 版本：v0.2.0 · 目标 JDK：21 · 状态：评审中
+> 版本：v0.4.0 · 目标 JDK：21 · 状态：已发布，随版本演进
 
 ---
 
@@ -39,7 +39,7 @@ LightQuery 是一个**低学习成本、类型安全、可进生产环境**的�
 - 分库分表、读写分离、多租户
 - 一级/二级缓存（直连 JDBC，交给连接池与业务层）
 - 关系映射（@OneToMany 级联加载等关联对象图管理）
-- 数据变更审计/数据追踪差异更新（roadmap v0.3）
+- 数据变更审计/数据追踪差异更新（roadmap 0.5.0：审计拦截器 SPI）
 
 ---
 
@@ -492,7 +492,7 @@ public interface FillListener {
   为 true 时会话的 `inTransaction` 不再自行 commit/rollback（交由外部事务管理器）。
 - 多 `DataSource` 候选时不自动装配（`@ConditionalOnSingleCandidate`），按 §5.0 手动注册。
 
-### 5.12 VO / record 投影（v0.3）
+### 5.12 VO / record 投影（0.4.0）
 
 ```java
 record OrderStat(Long userId, Long orderCount, BigDecimal totalAmount) {}
@@ -519,7 +519,7 @@ PageResult<UserRow> page = LightQuery.queryable(User.class)
 - 组件在结果集中找不到对应标签 → MappingException，消息列出可用标签；结果集多余列忽略。
 - 投影计划按类型缓存（ConcurrentHashMap，写路径只发生一次）。
 
-### 5.13 seek 逻辑分页（keyset，v0.3）
+### 5.13 seek 逻辑分页（keyset，0.4.0）
 
 ```java
 // 首页
@@ -536,7 +536,7 @@ List<User> page2 = LightQuery.queryable(User.class).orderByAsc(User::getId).seek
 - 前置校验：无 orderBy、值个数与排序列不符、值为 null、排序为聚合/别名 → SqlBuildException。
 - 深分页代价 O(1)（索引扫描），替代 offset 的 O(n) 扫描；语义上等价于全量排序后的窗口切片。
 
-### 5.14 update join / delete join（v0.3）
+### 5.14 update join / delete join（0.4.0）
 
 ```java
 // MySQL：UPDATE a, b SET .. WHERE ..（ON 并入 WHERE）
@@ -555,7 +555,7 @@ db.deletable(User.class)
 
 契约（测试固化，见 T20）：
 
-- `Updatable.join(Class, Consumer<JoinOn>)` / `Deletable.join(...)`：INNER join（v0.3 不支持
+- `Updatable.join(Class, Consumer<JoinOn>)` / `Deletable.join(...)`：INNER join（不支持
   LEFT/RIGHT join 写法），表不可重复 join；join 后条件可引用双方实体，`set(...)` 仍仅限目标实体
   （否则 SqlBuildException）。未 join 实体的条件同样报错并提示。
 - 方言决定语句形态（ON 条件一律预并入 WHERE；`Dialect` 按 6 字段 JoinPieces 自行拼装）：
@@ -570,7 +570,7 @@ db.deletable(User.class)
 - `Updatable.toSql()` / `Deletable.toSql()`：调试渲染最终 SQL 与参数（消费 builder，不执行）。
 
 ---
-### 5.15 exclude — 查询排除字段（v0.3）
+### 5.15 exclude — 查询排除字段（0.4.0）
 
 ```java
 // 排除后 SELECT * 变为显式列清单（不含 balance 和 remark）
@@ -583,7 +583,7 @@ List<User> rows = LightQuery.queryable(User.class)
 - 单表渲染为无别名列清单；join 渲染为 `t0.col` 别名限定的根实体列（过滤排除列）。
 - 投影 `toList(Class)` 引用被排除的列 → MappingException（消息列出可用标签）。
 
-### 5.16 raw SQL 逃生舱（v0.4）：`sqlHint` / `selectRaw` / `whereRaw` / `groupByRaw` / `orderByRaw`
+### 5.16 raw SQL 逃生舱（0.4.0）：`sqlHint` / `selectRaw` / `whereRaw` / `groupByRaw` / `orderByRaw`
 
 类型安全 API 无法覆盖的数据库特有表达式（优化器 hint、PolarDB 注释、`DATE_FORMAT`、
 `FIELD(...)` 自定义排序等）从这里进入。框架对 raw 内容**原样输出、永不转义**——
@@ -649,7 +649,7 @@ LightQuery.queryable(User.class)
 | SEQUENCE nextval | ❌（抛 SqlBuildException） | `SELECT nextval('seq')` | `SELECT NEXT VALUE FOR "seq"` |
 | upsert / 序列等 | roadmap | roadmap | roadmap |
 
-v0.3 起新增方言（§5.11 同款探测规则，按 JDBC 子协议 `:oracle:` / `:sqlserver:`）：
+0.4.0 起新增方言（§5.11 同款探测规则，按 JDBC 子协议 `:oracle:` / `:sqlserver:`）：
 
 | 能力 | Oracle (12c+) | SQL Server (2012+) |
 |---|---|---|
@@ -722,7 +722,7 @@ unchecked）——不新增自定义异常类型。
 2. SQL 渲染纯内存字符串构建，无正则热路径。
 3. 不做语句缓存（连接池/驱动层已做），不做结果缓存（原则 P4：可预期）。
 4. insertBatch 走 JDBC batch；fetchSize 可调（§7）。
-5. 分页 count 与 rows 两查（可预期性优先）；游标/seek 分页 roadmap v0.3。
+5. 分页 count 与 rows 两查（可预期性优先）；游标/seek 分页已落地（§5.13）。
 
 ---
 
@@ -823,7 +823,7 @@ light-query-parent/
 | 版本 | 核心能力 |
 |---|---|
 | 0.1.0 | 实体映射（JPA 注解）/ lambda 条件 / join / 子查询 / 聚合 / 逻辑删除 / 事务 / 方言 |
-| 0.2.0 | 静态门面 + 多数据源 / `@Version` 乐观锁 / SEQUENCE 主键 / 自连接（QueryTable）/ FillListener SPI / Spring Boot Starter / update join / delete join |
+| 0.2.0 | 静态门面 + 多数据源 / `@Version` 乐观锁 / SEQUENCE 主键 / 自连接（QueryTable）/ FillListener SPI / Spring Boot Starter |
 | 0.4.0 | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 / update join·delete join / exclude() / raw SQL 逃生舱（sqlHint/selectRaw/whereRaw/groupByRaw/orderByRaw）/ `SqlLogger` SPI / JPA `@Convert` / upsert + `insertBatch(batchSize)` / UNION·UNION ALL / saveOrUpdate / boolean 前置条件重载（删除 when()）|
 
 ### 0.5.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
