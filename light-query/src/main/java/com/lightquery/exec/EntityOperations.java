@@ -117,7 +117,7 @@ public final class EntityOperations {
         ColumnMeta version = meta.getVersionColumn();
         Object currentVersion = requireCurrentVersion(meta, version, entity);
         QueryModel model = new QueryModel(entity.getClass());
-        addPkConditions(model, meta, pkValues(meta, entity));
+        addPkConditions(model, meta, nonNullPkValues(meta, entity));
         addVersionCondition(model, meta, version, currentVersion);
         int rows = executeDelete(connections, dialect, model, meta, version, currentVersion);
         requireOneRow(rows, "delete", describePk(meta, pkValues(meta, entity)), version, currentVersion);
@@ -251,7 +251,7 @@ public final class EntityOperations {
         if (listener != null) {
             listener.onUpdate(entity);
         }
-        List<Object> pks = pkValues(meta, entity);
+        List<Object> pks = nonNullPkValues(meta, entity);
         ColumnMeta version = meta.getVersionColumn();
         Object currentVersion = requireCurrentVersion(meta, version, entity);
         List<ColumnMeta> setColumns = meta.getUpdatableColumns().stream()
@@ -362,6 +362,21 @@ public final class EntityOperations {
                     new ColumnRef(meta.getEntityClass(), logic.getColumnName()),
                     Operator.EQ, List.of(logic.normalValueAsDb())));
         }
+    }
+
+    /**
+     * Primary-key values of an entity for a keyed write — every value must be
+     * present, otherwise the WHERE clause would compare against NULL and
+     * silently match nothing.
+     */
+    private static List<Object> nonNullPkValues(EntityMeta meta, Object entity) {
+        List<Object> values = pkValues(meta, entity);
+        if (values.stream().anyMatch(Objects::isNull)) {
+            throw new MappingException("Cannot write " + meta.getEntityClass().getSimpleName()
+                    + " — its primary key is null (unsaved entity?). Set the id first or load "
+                    + "the entity via queryById.");
+        }
+        return values;
     }
 
     private static List<Object> pkValues(EntityMeta meta, Object entity) {

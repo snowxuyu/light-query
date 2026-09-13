@@ -40,7 +40,8 @@ public final class SqlBuilder {
      * are counted.
      */
     public static SqlFragment count(QueryModel model, Dialect dialect) {
-        boolean needsWrapper = model.isDistinct() || !model.getGroupBys().isEmpty();
+        boolean needsWrapper = model.isDistinct() || !model.getGroupBys().isEmpty()
+                || !model.getUnionPartners().isEmpty();
         if (!needsWrapper) {
             RenderContext ctx = new RenderContext(dialect);
             Scope scope = Scope.root(model, 0);
@@ -120,6 +121,11 @@ public final class SqlBuilder {
 
         StringBuilder joinTableList = new StringBuilder();
         for (JoinSpec join : model.getJoins()) {
+            if (join.on().isEmpty()) {
+                throw new SqlBuildException("Join to " + join.table().getTableName()
+                        + " has no ON condition — build it with the JoinOn consumer (an empty ON "
+                        + "would silently become a cross join)");
+            }
             String joinAlias = dialect.quote(scope.aliasOf(join.table()));
             if (joinTableList.length() > 0) {
                 joinTableList.append(", ");
@@ -227,6 +233,15 @@ public final class SqlBuilder {
         sql.append(" FROM ").append(fromClause(model, scope, ctx, depth));
         sql.append(renderWhere(model.getWhere(), scope, ctx, depth));
 
+        // GROUP BY / HAVING belong to this SELECT block, so they render before
+        // any UNION partners (and stay in place when counting through the
+        // sub-query wrapper — a grouped count must count groups, not rows)
+        if (!model.getGroupBys().isEmpty()) {
+            sql.append(" GROUP BY ");
+            appendJoined(sql, model.getGroupBys(), ", ", s -> renderSelectable(s, scope, ctx, depth, false));
+            sql.append(renderHaving(model, scope, ctx, depth));
+        }
+
         // UNION / UNION ALL: render partner SELECTs after the current one
         if (!model.getUnionPartners().isEmpty()) {
             sql.append(model.isUnionAll() ? " UNION ALL " : " UNION ");
@@ -242,21 +257,23 @@ public final class SqlBuilder {
         }
 
         if (!stripForCount) {
-            if (!model.getGroupBys().isEmpty()) {
-                sql.append(" GROUP BY ");
-                appendJoined(sql, model.getGroupBys(), ", ", s -> renderSelectable(s, scope, ctx, depth, false));
-                sql.append(renderHaving(model, scope, ctx, depth));
-            }
             if (!model.getOrderBys().isEmpty()) {
                 sql.append(" ORDER BY ");
                 appendJoined(sql, model.getOrderBys(), ", ", order -> renderOrder(order, scope, ctx, depth));
             }
-            if (model.isForUpdate()) {
-                sql.append(" FOR UPDATE");
-            }
+            // pagination comes BEFORE FOR UPDATE — MySQL/PostgreSQL reject the
+            // reverse order
             if (model.getLimit() != null) {
                 long offset = model.getOffset() == null ? 0 : model.getOffset();
-                return ctx.toFragment(dialect.page(sql.toString(), offset, model.getLimit()));
+                sql = new StringBuilder(dialect.page(sql.toString(), offset, model.getLimit()));
+            }
+            if (model.isForUpdate()) {
+                if (!dialect.supportsForUpdate()) {
+                    throw new SqlBuildException("The " + dialect.getClass().getSimpleName()
+                            + " dialect does not support SELECT .. FOR UPDATE — remove forUpdate() "
+                            + "or use a row-locking hint via sqlHint()");
+                }
+                sql.append(" FOR UPDATE");
             }
         }
         return ctx.toFragment(sql.toString());

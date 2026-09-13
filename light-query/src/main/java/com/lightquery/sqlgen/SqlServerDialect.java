@@ -36,6 +36,12 @@ public class SqlServerDialect implements Dialect {
     }
 
     @Override
+    public boolean supportsForUpdate() {
+        // SQL Server uses locking hints (UPDLOCK) instead — rendered via sqlHint()
+        return false;
+    }
+
+    @Override
     public String sequenceNextValueSql(String sequenceName) {
         return "SELECT NEXT VALUE FOR " + quote(sequenceName);
     }

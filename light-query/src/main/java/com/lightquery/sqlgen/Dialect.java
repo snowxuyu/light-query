@@ -31,6 +31,14 @@ public interface Dialect {
     }
 
     /**
+     * Whether the database accepts {@code SELECT .. FOR UPDATE}. SQL Server,
+     * for example, uses locking hints instead and rejects the clause.
+     */
+    default boolean supportsForUpdate() {
+        return true;
+    }
+
+    /**
      * SQL that returns the next value of a sequence as a single-row,
      * single-column result, e.g. {@code SELECT nextval('order_seq')}.
      *

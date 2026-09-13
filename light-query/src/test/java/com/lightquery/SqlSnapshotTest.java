@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** T3 — generated SQL snapshots (dialect-quoted, no database involved). */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -231,5 +232,31 @@ class SqlSnapshotTest {
         assertEquals("SELECT /*+ SeqScan(t_user) */ * FROM \"t_user\""
                 + " WHERE (age > ?) AND \"deleted\" = ?"
                 + " ORDER BY random() | params=[40, 0]", pgSql);
+    }
+
+    @Test
+    void forUpdateRendersAfterPagination() {
+        // MySQL rejects FOR UPDATE before LIMIT — pagination must come first
+        String sql = db.queryable(User.class)
+                .col(User::getId).eq(5L)
+                .forUpdate()
+                .limit(5)
+                .toSql();
+        assertTrue(sql.contains("LIMIT 5 OFFSET 0 FOR UPDATE"), sql);
+    }
+
+    @Test
+    void groupByRendersBeforeUnionPartners() {
+        // GROUP BY belongs to the first SELECT block, not to the compound
+        String sql = db.queryable(User.class)
+                .select(User::getStatus)
+                .groupBy(User::getStatus)
+                .union(db.queryable(User.class)
+                        .select(User::getStatus)
+                        .col(User::getStatus).eq(User.Status.ACTIVE))
+                .toSql();
+        int groupBy = sql.indexOf("GROUP BY");
+        int union = sql.indexOf(" UNION ");
+        assertTrue(groupBy >= 0 && union > groupBy, sql);
     }
 }

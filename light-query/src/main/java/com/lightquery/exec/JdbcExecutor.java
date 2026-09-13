@@ -143,9 +143,11 @@ public final class JdbcExecutor {
             logger.beforeExecute(fragment.sql(), fragment.params());
         }
         Connection connection = null;
+        boolean releasedCleanly = false;
         try {
             connection = provider.get();
             T result = work.run(connection);
+            releasedCleanly = true;
             if (logger != null) {
                 logger.afterExecute(fragment.sql(), (System.nanoTime() - start) / 1_000_000);
             }
@@ -160,7 +162,14 @@ public final class JdbcExecutor {
             throw new DataAccessException("connection acquisition", List.of(), e);
         } finally {
             if (connection != null) {
-                provider.release(connection);
+                try {
+                    provider.release(connection);
+                } catch (RuntimeException releaseError) {
+                    // a failing release must never mask the statement's own failure
+                    if (releasedCleanly) {
+                        throw releaseError;
+                    }
+                }
             }
         }
     }
@@ -180,19 +189,34 @@ public final class JdbcExecutor {
         }
     }
 
-    /** Builds an entity row mapper over the cached {@link EntityMeta}. */
+    /**
+     * Builds an entity row mapper over the cached {@link EntityMeta}. The
+     * label-to-column resolution runs once per result set (the mapper instance
+     * is created per query call), not once per row.
+     */
     public static <E> RowMapper<E> entityMapper(EntityMeta meta) {
-        return rs -> {
-            E entity = meta.newEntity();
-            ResultSetMetaData md = rs.getMetaData();
-            for (int i = 1; i <= md.getColumnCount(); i++) {
-                String label = md.getColumnLabel(i);
-                ColumnMeta column = meta.byLabel(label);
-                if (column != null) {
-                    column.writeValue(entity, column.fromDbValue(rs.getObject(i)));
+        return new RowMapper<>() {
+            private ColumnMeta[] columns;
+
+            @Override
+            public E map(ResultSet rs) throws SQLException {
+                if (columns == null) {
+                    ResultSetMetaData md = rs.getMetaData();
+                    ColumnMeta[] resolved = new ColumnMeta[md.getColumnCount()];
+                    for (int i = 0; i < resolved.length; i++) {
+                        resolved[i] = meta.byLabel(md.getColumnLabel(i + 1));
+                    }
+                    columns = resolved;
                 }
+                E entity = meta.newEntity();
+                for (int i = 0; i < columns.length; i++) {
+                    ColumnMeta column = columns[i];
+                    if (column != null) {
+                        column.writeValue(entity, column.fromDbValue(rs.getObject(i + 1)));
+                    }
+                }
+                return entity;
             }
-            return entity;
         };
     }
 

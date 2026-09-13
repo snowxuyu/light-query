@@ -184,4 +184,18 @@ class UpdateJoinTest {
                 .join(Order.class, on -> on.col(User::getId).eqColumn(Order::getUserId)));
         assertTrue(e.getMessage().contains("already part of this query"), e.getMessage());
     }
+
+    @Test
+    void joinWithEmptyOnIsRejected() {
+        // an empty ON group would silently degrade into a cross join
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(SqlBuildException.class, () ->
+                LightQuery.primary(h2.dataSource).dialect(new MySqlDialect())
+                        .updatable(User.class)
+                        .join(Order.class, on -> { })
+                        .col(User::getName).eq("x")
+                        .col(User::getStatus).set(User.Status.FROZEN)
+                        .toSql());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                ex.getMessage().contains("no ON condition"), ex.getMessage());
+    }
 }

@@ -1,6 +1,7 @@
 package com.lightquery;
 
 import com.lightquery.entity.User;
+import com.lightquery.exception.MappingException;
 import com.lightquery.exception.UnexpectedRowsException;
 import com.lightquery.support.TestDb;
 
@@ -13,6 +14,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -114,5 +116,15 @@ class CrudH2Test {
     void queryByIdRespectsLogicFilter() {
         User user = LightQuery.insert(h2.user("gone", User.Status.ACTIVE, 5, null, null, 1));
         assertNull(LightQuery.queryById(User.class, user.getId()));
+    }
+
+    @Test
+    void updateWithNullPrimaryKeyFailsWithGuidance() {
+        User unsaved = new User("no-id", User.Status.ACTIVE, 1, null,
+                java.time.LocalDateTime.of(2024, 1, 1, 0, 0), null, 0);
+        var ex = assertThrows(MappingException.class, () -> LightQuery.update(unsaved));
+        assertTrue(ex.getMessage().contains("primary key is null"), ex.getMessage());
+        var ex2 = assertThrows(MappingException.class, () -> LightQuery.delete(unsaved));
+        assertTrue(ex2.getMessage().contains("primary key is null"), ex2.getMessage());
     }
 }

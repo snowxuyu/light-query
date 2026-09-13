@@ -24,7 +24,10 @@ final class Escape {
 
     static String escape(String value) {
         if (value == null) {
-            return null;
+            // a null pattern would silently render as the literal string "null"
+            throw new com.lightquery.exception.SqlBuildException(
+                    "like/startsWith/endsWith value must not be null — use isNull() for "
+                    + "null matching, or pass an empty string");
         }
         return value
                 .replace("\\", "\\\\")

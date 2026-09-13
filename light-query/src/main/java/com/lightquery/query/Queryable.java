@@ -463,12 +463,18 @@ public final class Queryable<T> {
     }
     public Queryable<T> limit(long limit) {
         ensureOpen();
+        if (limit < 0) {
+            throw new SqlBuildException("limit must be >= 0, got " + limit);
+        }
         model.setLimit(limit);
         return this;
     }
 
     public Queryable<T> offset(long offset) {
         ensureOpen();
+        if (offset < 0) {
+            throw new SqlBuildException("offset must be >= 0, got " + offset);
+        }
         model.setOffset(offset);
         return this;
     }

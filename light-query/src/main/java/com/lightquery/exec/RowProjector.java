@@ -61,7 +61,7 @@ public final class RowProjector<R> {
             List<Property> properties = new ArrayList<>(components.length);
             for (int i = 0; i < components.length; i++) {
                 componentTypes[i] = components[i].getType();
-                properties.add(new Property(components[i].getName(), components[i].getType()));
+                properties.add(new Property(components[i].getName(), components[i].getType(), null));
             }
             try {
                 Constructor<?> constructor = type.getDeclaredConstructor(componentTypes);
@@ -69,6 +69,9 @@ public final class RowProjector<R> {
                 return new RowProjector<>(type, Kind.RECORD, constructor, properties);
             } catch (NoSuchMethodException e) {
                 throw new MappingException("Record " + type.getName() + " has no canonical constructor", e);
+            } catch (RuntimeException e) {
+                throw new MappingException("Cannot access the canonical constructor of record "
+                        + type.getName() + " — open its module/package to light-query", e);
             }
         }
         if (type.isInterface() || java.lang.reflect.Modifier.isAbstract(type.getModifiers())) {
@@ -82,14 +85,18 @@ public final class RowProjector<R> {
         } catch (NoSuchMethodException e) {
             throw new MappingException(type.getName()
                     + " needs a no-arg constructor to be used as a projection type", e);
+        } catch (RuntimeException e) {
+            throw new MappingException("Cannot access the no-arg constructor of "
+                    + type.getName() + " — open its module/package to light-query", e);
         }
-        Map<String, Class<?>> setters = new java.util.LinkedHashMap<>();
+        // resolve setter Methods once; re-resolving per row is O(rows x props) reflection
+        Map<String, Method> setters = new java.util.LinkedHashMap<>();
         for (Method method : type.getMethods()) {
             if (method.getName().startsWith("set") && method.getName().length() > 3
                     && method.getParameterCount() == 1) {
                 String property = Character.toLowerCase(method.getName().charAt(3))
                         + method.getName().substring(4);
-                setters.put(property, method.getParameterTypes()[0]);
+                setters.put(property, method);
             }
         }
         if (setters.isEmpty()) {
@@ -97,8 +104,9 @@ public final class RowProjector<R> {
                     + " has no setters — a VO projection type needs setters for the selected columns");
         }
         List<Property> properties = new ArrayList<>(setters.size());
-        for (Map.Entry<String, Class<?>> entry : setters.entrySet()) {
-            properties.add(new Property(entry.getKey(), entry.getValue()));
+        for (Map.Entry<String, Method> entry : setters.entrySet()) {
+            properties.add(new Property(entry.getKey(), entry.getValue().getParameterTypes()[0],
+                    entry.getValue()));
         }
         return new RowProjector<>(type, Kind.POJO, constructor, properties);
     }
@@ -117,11 +125,8 @@ public final class RowProjector<R> {
             }
             R instance = (R) constructor.newInstance();
             for (Property property : properties) {
-                String setter = "set" + Character.toUpperCase(property.name().charAt(0))
-                        + property.name().substring(1);
-                Method method = type.getMethod(setter, property.type());
                 Object value = coerce(labelValue(row, property.name()), property.type());
-                method.invoke(instance, value);
+                property.setter().invoke(instance, value);
             }
             return instance;
         } catch (MappingException e) {
@@ -273,6 +278,6 @@ public final class RowProjector<R> {
 
     private enum Kind { RECORD, POJO }
 
-    private record Property(String name, Class<?> type) {
+    private record Property(String name, Class<?> type, Method setter) {
     }
 }

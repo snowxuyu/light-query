@@ -11,7 +11,11 @@ import org.junit.jupiter.api.TestInstance;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.lightquery.exception.SqlBuildException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -141,5 +145,40 @@ class QueryH2Test {
     void dynamicTableName() {
         // asTable routes the query to a physical table (sharding scenario)
         assertEquals(0, LightQuery.queryable(User.class).asTable("t_user_202401").count());
+    }
+
+    @Test
+    void countOnGroupedQueryCountsGroupsNotRows() {
+        // 3 ACTIVE + 1 FROZEN -> 2 status groups; a plain row count would say 4
+        long groups = LightQuery.queryable(User.class)
+                .select(User::getStatus)
+                .groupBy(User::getStatus)
+                .count();
+        assertEquals(2, groups);
+    }
+
+    @Test
+    void countOnUnionCountsTheCompound() {
+        long n = LightQuery.queryable(User.class)
+                .col(User::getName).eq("alice")
+                .union(LightQuery.queryable(User.class)
+                        .col(User::getName).eq("bob"))
+                .count();
+        assertEquals(2, n);
+    }
+
+    @Test
+    void likeWithNullValueFailsFast() {
+        var ex = assertThrows(SqlBuildException.class, () ->
+                LightQuery.queryable(User.class).col(User::getName).like(null).toSql());
+        assertTrue(ex.getMessage().contains("must not be null"), ex.getMessage());
+    }
+
+    @Test
+    void negativeLimitAndOffsetAreRejected() {
+        assertThrows(SqlBuildException.class,
+                () -> LightQuery.queryable(User.class).limit(-1).toSql());
+        assertThrows(SqlBuildException.class,
+                () -> LightQuery.queryable(User.class).offset(-5).toSql());
     }
 }

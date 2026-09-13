@@ -5,6 +5,7 @@ import jakarta.persistence.AttributeConverter;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -61,7 +62,13 @@ public final class ColumnMeta {
         this.logicDeleteNormalValue = logicDeleteNormalValue;
         this.logicDeleteDeletedValue = logicDeleteDeletedValue;
         this.converter = converter;
-        this.field.setAccessible(true);
+        try {
+            this.field.setAccessible(true);
+        } catch (RuntimeException e) {
+            throw new MappingException("Cannot access field '" + propertyName + "' of "
+                    + field.getDeclaringClass().getName() + " — open its module/package to "
+                    + "light-query (e.g. --add-opens) or make the field public", e);
+        }
     }
 
     public Field getField() {
@@ -202,13 +209,25 @@ public final class ColumnMeta {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Object enumFromName(String name) {
-        return Enum.valueOf((Class<? extends Enum>) field.getType(), name);
+        try {
+            return Enum.valueOf((Class<? extends Enum>) field.getType(), name);
+        } catch (IllegalArgumentException e) {
+            throw new MappingException("Cannot map database value '" + name + "' to enum "
+                    + field.getType().getName() + " for column '" + columnName + "' — valid "
+                    + "constants: " + Arrays.toString(field.getType().getEnumConstants()), e);
+        }
     }
 
     @SuppressWarnings("unchecked")
     private Object enumFromOrdinal(int ordinal) {
         Class<? extends Enum<?>> type = (Class<? extends Enum<?>>) field.getType();
-        return type.getEnumConstants()[ordinal];
+        Object[] constants = type.getEnumConstants();
+        if (ordinal < 0 || ordinal >= constants.length) {
+            throw new MappingException("Cannot map database value " + ordinal + " to enum "
+                    + type.getName() + " for column '" + columnName + "' — ordinal out of "
+                    + "range 0.." + (constants.length - 1) + " (did the enum change order?)");
+        }
+        return constants[ordinal];
     }
 
     private Object coerce(Object value) {

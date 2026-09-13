@@ -335,6 +335,10 @@ public final class EntityMeta {
         } catch (NoSuchMethodException e) {
             throw new MappingException(entityClass.getName()
                     + " needs a no-arg constructor to be used as an entity", e);
+        } catch (RuntimeException e) {
+            throw new MappingException("Cannot access the no-arg constructor of "
+                    + entityClass.getName() + " — open its module/package to light-query "
+                    + "(e.g. --add-opens) or make the constructor public", e);
         }
     }
 

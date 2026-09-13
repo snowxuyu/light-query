@@ -6,6 +6,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-09-13
+
+### Fixed
+- **Grouped `count()` counted rows, not groups** (P0): the count wrapper
+  stripped `GROUP BY`/`HAVING` from the inner query, so
+  `queryable(...).select(...).groupBy(...).count()` returned the row count.
+  `GROUP BY`/`HAVING` now stay in the inner query; `ORDER BY`/paging are
+  still stripped. Also fixes grouped `toPageResult` totals.
+- **`count()` on a UNION query ignored the partners** and counted only the
+  root branch; the compound is now wrapped and counted as a whole.
+- **`forUpdate()` + `limit()` rendered invalid SQL**: the clauses came out as
+  `FOR UPDATE LIMIT ..` — MySQL/PostgreSQL require pagination before the
+  locking clause. Rendering order is now `ORDER BY -> LIMIT -> FOR UPDATE`.
+- **`groupBy` + `union` rendered invalid SQL**: `GROUP BY` trailed the
+  compound; it now renders inside its own SELECT block (before the partners).
+- **Empty join ON groups are rejected** in update join / delete join (an
+  empty `JoinOn` consumer would silently degrade into a cross join); the
+  SELECT path already rejected it.
+- **`like(null)`/`startsWith(null)`/`endsWith(null)`** silently built the
+  pattern `%null%`; they now fail fast with guidance (use `isNull()`).
+- **`limit(-1)` / `offset(-5)`** are rejected eagerly instead of by the
+  database.
+- **`update(entity)` / `delete(entity)` with a null primary key** produced a
+  misleading "row may have been deleted concurrently" error; they now fail
+  with "primary key is null (unsaved entity?)".
+- **Enum mapping errors are wrapped** with the column, valid constants and
+  range instead of raw `IllegalArgumentException`/`ArrayIndexOutOfBounds`.
+- **Reflection access failures produce guidance** (`--add-opens`) instead of
+  raw `InaccessibleObjectException` (entity constructor, fields, projection
+  constructors).
+- **A failing connection release no longer masks the statement's own error**
+  in `JdbcExecutor`.
+
+### Changed
+- `SqlServerDialect` rejects `SELECT .. FOR UPDATE` (`supportsForUpdate()`)
+  — SQL Server uses locking hints; rendering `FOR UPDATE` there would have
+  produced invalid SQL.
+- `entityMapper` resolves result-set metadata and label→column mapping once
+  per query instead of once per row; VO projections cache their setter
+  `Method` handles at plan build time.
+
 ## [0.4.1] — 2026-09-13
 
 ### Added

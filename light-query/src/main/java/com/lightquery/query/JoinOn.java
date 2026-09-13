@@ -76,8 +76,6 @@ public final class JoinOn<A, B> {
     }
 
 
-    /** Applies {@code block} only when {@code condition} is true. */
-
     /**
      * Appends a raw SQL fragment to the ON clause (escape hatch for dialect
      * functions the typed API does not cover). The fragment is emitted
