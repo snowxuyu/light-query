@@ -328,6 +328,7 @@ public final class Queryable<T> {
     <R> List<R> toList(Class<R> projectionType);     // VO/record 投影（§5.12），名字忽略大小写与下划线匹配
     <R> PageResult<R> toPageResult(long pageNo, long pageSize, Class<R> projectionType); // 投影分页
     Queryable<T> seekAfter(Object... values);        // keyset 逻辑分页（§5.13），值与排序列一一对应
+    Queryable<T> exclude(SFunction<?, ?>... cols);  // 排除字段：SELECT * → 显式列清单（§5.15）
     String toSql();                                  // 调试用：返回 SQL 与参数（不打日志不执行）
 }
 ```
@@ -567,6 +568,20 @@ db.deletable(User.class)
 - 逻辑删除实体的 delete join 走 UPDATE join（置 deleted 标记）；`physical()` 强制物理 DELETE join。
 - `@Version` 不参与 fluent update/delete（与单表行为一致）。
 - `Updatable.toSql()` / `Deletable.toSql()`：调试渲染最终 SQL 与参数（消费 builder，不执行）。
+
+---
+### 5.15 exclude — 查询排除字段（v0.3）
+
+```java
+// 排除后 SELECT * 变为显式列清单（不含 balance 和 remark）
+List<User> rows = LightQuery.queryable(User.class)
+    .exclude(User::getBalance, User::getRemark)
+    .toList();
+```
+
+- 仅在未调用 `select(...)` 时生效；显式 select 后 exclude 被忽略。
+- 单表渲染为无别名列清单；join 渲染为 `t0.col` 别名限定的根实体列（过滤排除列）。
+- 投影 `toList(Class)` 引用被排除的列 → MappingException（消息列出可用标签）。
 
 ---
 ## 6. SQL 生成规则（SqlBuilder + Dialect）
