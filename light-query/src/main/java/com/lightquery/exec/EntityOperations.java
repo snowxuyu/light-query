@@ -142,7 +142,28 @@ public final class EntityOperations {
     /**
      * Inserts the entity, or updates it if the primary key already exists.
      * Uses dialect-specific upsert syntax (MySQL {@code ON DUPLICATE KEY
-     * UPDATE}, PG {@code ON CONFLICT DO UPDATE}).
+     * UPDATE}, PG {@code ON CONFLICT DO UPDATE}, H2 {@code MERGE .. KEY}).
+     *
+     * <p>The {@link FillListener} gets both {@code onInsert} and
+     * {@code onUpdate} callbacks before the statement is built (insert-only
+     * and update-only fields each get filled). Does not participate in
+     * {@code @Version} optimistic locking — the duplicate-handling clause
+     * cannot express an expected-version check; use {@code saveOrUpdate}
+     * for that. Generated primary keys are not back-filled.</p>
+     */
+    /**
+     * Inserts the entity, or updates it if the primary key already exists.
+     * Uses dialect-specific upsert syntax (MySQL {@code ON DUPLICATE KEY
+     * UPDATE}, PG {@code ON CONFLICT DO UPDATE}, H2 {@code MERGE .. KEY}).
+     *
+     * <p>When any primary-key value is null the statement could never match an
+     * existing row, so it degenerates to a plain {@link #insert} (identity /
+     * sequence key generation and back-fill included, only {@code onInsert}
+     * fills fire). Otherwise the {@link FillListener} gets both
+     * {@code onInsert} and {@code onUpdate} callbacks before the statement is
+     * built. Does not participate in {@code @Version} optimistic locking —
+     * the duplicate-handling clause cannot express an expected-version check;
+     * use {@code saveOrUpdate} for that.</p>
      */
     public static <E> void upsert(ConnectionProvider connections, Dialect dialect, E entity) {
         EntityMeta meta = EntityMetaCache.of(entity.getClass());
@@ -150,7 +171,26 @@ public final class EntityOperations {
             throw new SqlBuildException("The " + dialect.getClass().getSimpleName()
                     + " dialect does not support upsert — use insert + update instead");
         }
-        List<ColumnMeta> columns = meta.getInsertableColumns();
+        List<Object> pkValues = pkValues(meta, entity);
+        if (pkValues.stream().anyMatch(Objects::isNull)) {
+            insert(connections, dialect, entity);
+            return;
+        }
+        FillListener listener = FillListeners.current();
+        if (listener != null) {
+            listener.onInsert(entity);
+            listener.onUpdate(entity);
+        }
+        // identity PKs are normally generated and stay out of the column list;
+        // with a non-null value they must join the statement so the conflict
+        // clause can actually match an existing row
+        List<ColumnMeta> columns = new ArrayList<>(meta.getInsertableColumns());
+        for (ColumnMeta key : meta.getPrimaryKeys()) {
+            boolean listed = columns.stream().anyMatch(c -> c.getColumnName().equals(key.getColumnName()));
+            if (!listed) {
+                columns.add(key);
+            }
+        }
         List<String> names = columns.stream().map(ColumnMeta::getColumnName).toList();
         List<String> keyColumns = meta.getPrimaryKeys().stream()
                 .map(ColumnMeta::getColumnName).toList();

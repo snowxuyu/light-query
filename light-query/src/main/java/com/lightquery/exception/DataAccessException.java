@@ -1,5 +1,7 @@
 package com.lightquery.exception;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -15,7 +17,11 @@ public class DataAccessException extends LightQueryException {
     public DataAccessException(String sql, List<Object> params, Throwable cause) {
         super("SQL execution failed: " + sql + " | params=" + params, cause);
         this.sql = sql;
-        this.params = List.copyOf(params);
+        // bind values legitimately contain nulls; List.copyOf would reject them
+        // and mask the real SQL error with a NullPointerException
+        this.params = params == null
+                ? List.of()
+                : Collections.unmodifiableList(new ArrayList<>(params));
     }
 
     public String getSql() {

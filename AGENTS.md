@@ -12,7 +12,8 @@ light-query：面向 Java 21 的低学习成本、类型安全轻量 ORM。
 
 1. **`docs/DESIGN.md` 是契约**：任何行为变更必须先改该文档（含 §11 测试矩阵），
    再改代码；代码与文档不一致时以修齐一致为任务。
-2. **禁止新增运行时依赖**：编译依赖只有 `jakarta.persistence-api`；
+2. **禁止新增运行时依赖**：编译依赖只有 `jakarta.persistence-api`
+   （`slf4j-api` 为 optional，仅 `LightQueryLoggers` 适配器工厂使用）；
    测试依赖（JUnit/H2）不在此限。
 3. **公共 API 必须有 JavaDoc**；所有框架异常消息必须"说明问题 + 指出修复方式"。
 4. **SQL 只在 `sqlgen/SqlBuilder` 生成**；一切数据库语法差异必须进 `Dialect`；
@@ -22,7 +23,7 @@ light-query：面向 Java 21 的低学习成本、类型安全轻量 ORM。
 
 ```bash
 # 需要 JDK 21
-mvn verify        # 全量构建 + 183 个测试（T1-T27 矩阵）
+mvn verify        # 全量构建 + 191 个测试（T1-T28 矩阵）
 mvn test          # 仅测试
 ```
 

@@ -13,6 +13,7 @@ import com.lightquery.lambda.LambdaUtils;
 import com.lightquery.lambda.SFunction;
 import com.lightquery.meta.ColumnMeta;
 import com.lightquery.meta.EntityMeta;
+import com.lightquery.meta.EntityMetaCache;
 import com.lightquery.query.model.ColumnRef;
 import com.lightquery.query.model.Condition;
 import com.lightquery.query.model.ConditionGroup;
@@ -181,24 +182,58 @@ public final class Queryable<T> {
 
     /**
      * Combines this query with another using UNION (deduplicates rows).
-     * Both queries must have the same number and order of columns.
+     * Both queries must select the same number of columns.
+     *
+     * <p>Ordering and paging apply to the whole compound — put them on this
+     * root query; the partner must not carry {@code orderBy / limit / offset /
+     * forUpdate} (SqlBuildException otherwise). Column count is validated
+     * eagerly: explicit projections count their expressions, default
+     * projections count all entity columns minus excluded ones.</p>
      */
     public Queryable<T> union(Queryable<T> other) {
         ensureOpen();
         other.ensureOpen();
-        model.getUnionPartners().add(other.model);
+        model.getUnionPartners().add(unionPartner(other));
         return this;
     }
 
     /**
      * Combines this query with another using UNION ALL (keeps duplicates).
+     * Same partner rules as {@link #union(Queryable)}.
      */
     public Queryable<T> unionAll(Queryable<T> other) {
         ensureOpen();
         other.ensureOpen();
         model.setUnionAll(true);
-        model.getUnionPartners().add(other.model);
+        model.getUnionPartners().add(unionPartner(other));
         return this;
+    }
+
+    /** Validates the partner shape (fail-fast) and returns its model. */
+    private QueryModel unionPartner(Queryable<T> other) {
+        QueryModel partner = other.model;
+        if (!partner.getOrderBys().isEmpty() || partner.getLimit() != null
+                || partner.getOffset() != null || partner.isForUpdate()) {
+            throw new SqlBuildException("A UNION partner must not carry orderBy/limit/offset/forUpdate — "
+                    + "ordering and paging apply to the whole compound: move them to the root query");
+        }
+        int expected = columnWidth(model);
+        int actual = columnWidth(partner);
+        if (expected != actual) {
+            throw new SqlBuildException("UNION column count mismatch — the root query selects "
+                    + expected + " column(s) but the partner selects " + actual
+                    + " column(s); both sides must select the same columns in the same order");
+        }
+        return partner;
+    }
+
+    /** Column count of a model's projection: explicit select list, or all entity columns minus excluded. */
+    private static int columnWidth(QueryModel m) {
+        if (!m.getSelectExprs().isEmpty()) {
+            return m.getSelectExprs().size();
+        }
+        return EntityMetaCache.of(m.getRoot().getEntityClass()).getColumns().size()
+                - m.getExcludedColumns().size();
     }
 
     // ------------------------------------------------------------------ sub-queries
@@ -607,8 +642,8 @@ public final class Queryable<T> {
             OrderBy order = orders.get(i);
             if (!(order instanceof OrderBy.ByExpr byExpr)
                     || !(byExpr.expr() instanceof ColumnRef ref)) {
-                throw new SqlBuildException("seekAfter(...) needs plain column orderBy — aggregates "
-                        + "and alias-based ordering cannot be used as a seek key");
+                throw new SqlBuildException("seekAfter(...) needs plain column orderBy — aggregates, "
+                        + "alias-based and raw orderBys cannot be used as a seek key");
             }
             TableRef table = ref.tableAlias() != null
                     ? model.findTableByAlias(ref.tableAlias())

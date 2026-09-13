@@ -543,7 +543,8 @@ LightQuery.deletable(User.class)
 ### 6.4 upsert 与 saveOrUpdate
 
 ```java
-// upsert：唯一键冲突时转更新（MySQL ON DUPLICATE KEY / PG、H2 ON CONFLICT）
+// upsert：唯一键冲突时转更新（MySQL ON DUPLICATE KEY / PG ON CONFLICT / H2 MERGE..KEY）
+// 主键有值才可能命中冲突；主键为空时等价于 insert，只触发 FillListener.onInsert
 LightQuery.upsert(user);
 
 // saveOrUpdate：主键为空走 insert，有主键先查存在则 update
@@ -704,12 +705,23 @@ private Money amount;
 ## 13. SQL 日志
 
 ```java
-// 开发环境：打印每条 SQL
+// 开箱即用：SLF4J 适配器（slf4j-api 为 optional 依赖，加了就能用）
+LightQuery.setSqlLogger(LightQueryLoggers.slf4j());                // logger 名 "light-query"
+LightQuery.setSqlLogger(LightQueryLoggers.slf4j("com.myapp.sql")); // 自定义 logger 名
+
+// 输出形态：执行前 DEBUG，耗时 DEBUG，失败 ERROR（带异常）
+// --> SELECT * FROM t_user WHERE age > ? | params=[18]
+// <-- 3 ms | SELECT * FROM t_user WHERE age > ?
+
+// 自定义：接文件、监控、采样……
 LightQuery.setSqlLogger(new SqlLogger() {
-    public void beforeExecute(String sql, List<Object> params) {
-        System.out.println("SQL: " + sql + " | params=" + params);
-    }
+    public void beforeExecute(String sql, List<Object> params) { ... }
+    public void afterExecute(String sql, long elapsedMs) { ... }
+    public void onError(String sql, List<Object> params, Exception e) { ... }
 });
+
+// 关闭
+LightQuery.clearSqlLogger();
 ```
 
 ---
@@ -806,7 +818,7 @@ LightQuery.setSqlLogger(new SqlLogger() {
 - 自动填充：`FillListener` SPI
 - 类型转换：JPA `@Convert` / `AttributeConverter`
 - SQL 日志：`SqlLogger` SPI
-- upsert：MySQL（`ON DUPLICATE KEY`）/ PG、H2（`ON CONFLICT`）
+- upsert：MySQL（`ON DUPLICATE KEY`）/ PG（`ON CONFLICT`）/ H2（`MERGE .. KEY`）
 - 关联写入：update join / delete join（MySQL / PG / SQL Server；Oracle、H2 报错并提示 IN 子查询）
 - raw SQL：`sqlHint` / `selectRaw` / `whereRaw` / `groupByRaw` / `orderByRaw` 逃生舱
 - 集合运算：`union` / `unionAll`；`saveOrUpdate` 按主键分流

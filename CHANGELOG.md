@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-09-13
+
+### Added
+- `LightQueryLoggers.slf4j()` / `slf4j(String)` / `slf4j(Logger)`: ready-made
+  `SqlLogger` writing statements and timings at DEBUG and failures at ERROR
+  (with the exception attached). `slf4j-api` is an **optional** dependency —
+  zero runtime impact unless the adapter factory is invoked; when SLF4J is
+  missing the factory fails with guidance. Test matrix T28.
+
+### Fixed
+- **upsert actually works on H2 now**: H2 2.x rejects both
+  `ON CONFLICT .. DO UPDATE` and `ON DUPLICATE KEY UPDATE` in regular mode
+  (probed against 2.2.224) — `H2Dialect` renders the native
+  `MERGE INTO .. KEY ..` form. Previously the first real upsert execution
+  would have failed with a syntax error.
+- **upsert can now fire its conflict path for identity keys**: a non-null
+  identity primary key joins the statement's column list so the
+  duplicate-handling clause can match an existing row (previously identity
+  keys were always omitted, making every upsert a fresh insert).
+- A failing statement no longer masks its SQL error with a
+  NullPointerException when any bind parameter is null
+  (`DataAccessException` copied params via `List.copyOf`, which rejects null
+  elements — null bind values are perfectly legal).
+- `upsert` now triggers `FillListener` (`onInsert` + `onUpdate` when all
+  primary-key values are non-null; degenerates to `insert` with only
+  `onInsert` otherwise) — it previously bypassed auto-filling entirely.
+- `union` / `unionAll` fail fast instead of rendering invalid SQL: partners
+  carrying `orderBy / limit / offset / forUpdate` are rejected with guidance
+  (ordering and paging belong on the root query of the compound), and
+  column-count mismatches between root and partner are rejected eagerly with
+  both counts.
+
 ## [0.4.0] — 2026-09-13
 
 ### Added

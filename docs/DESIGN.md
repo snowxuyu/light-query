@@ -613,6 +613,62 @@ LightQuery.queryable(User.class)
 - raw 片段中的标识符不经方言转义；在标识符大小写敏感的库（如 H2 建表带引号）中
   需自行写与建表一致的引用形式。
 
+### 5.17 SQL 日志：`SqlLogger` SPI 与 SLF4J 适配器
+
+```java
+LightQuery.setSqlLogger(LightQueryLoggers.slf4j());       // SLF4J 适配器（optional 依赖）
+LightQuery.setSqlLogger(new SqlLogger() { ... });          // 自定义：文件/监控/采样
+```
+
+契约（测试固化，见 T25 / T28）：
+
+- 三个回调：`beforeExecute(sql, params)`、`afterExecute(sql, elapsedMs)`、
+  `onError(sql, params, e)`；`onError` 返回后原样重抛业务异常。
+- 适配器 `LightQueryLoggers.slf4j()` / `slf4j(String loggerName)`：无状态、线程安全；
+  执行前 DEBUG `--> sql | params=[..]`，成功后 DEBUG `<-- n ms | sql`，失败 ERROR 输出
+  SQL/参数并附异常。
+- `slf4j-api` 为 **optional** 编译依赖，不进运行时依赖清单（铁律 #2）；类路径缺失时
+  工厂抛 IllegalStateException，消息指出添加 `org.slf4j:slf4j-api` + binding 或改用
+  自定义 `SqlLogger`。
+- 未注册 logger 时零开销（SPI 默认方法全部为空实现）。
+
+### 5.18 写入扩展：upsert / saveOrUpdate / insertBatch(batchSize)
+
+- `upsert(entity)`：方言决定语句形态（§6.3 upsert 行），冲突目标为全部主键列；
+  不支持的方言抛 SqlBuildException 并提示 insert + update 替代。
+- FillListener：主键值全非空时 upsert 依次触发 `onInsert` **和** `onUpdate`
+  （插入专用字段与更新专用字段各自得到填充）；任一主键为空则语句不可能命中冲突，
+  upsert 等价于 `insert`（只触发 `onInsert`，identity/sequence 生成与回填照常）。
+  （0.4.1 起生效，测试见 T23）
+- 主键与冲突：冲突目标为全部主键列；identity 主键在实体携带非空 id 时进入列清单
+  参与冲突检测；upsert 不回填生成主键。
+- `@Version`：upsert 不参与乐观锁——与 fluent `Updatable/Deletable` 同一取舍
+  （ON DUPLICATE 语句无法表达预期版本校验）；需要乐观锁语义时用 `saveOrUpdate`
+  或手工比较版本列。
+- `saveOrUpdate(entity)`：主键全空 → insert；否则按主键 SELECT 判存在后走 update/insert
+  （应用层两步，并发下存在 TOCTOU 窗口，高吞吐场景用 upsert）。identity/sequence
+  主键生成、FillListener、`@Version` 完全沿用实体级 insert/update 语义。
+- `insertBatch(list, batchSize)`：按 batchSize 分批提交 JDBC batch，
+  其余语义（sequence 逐实体取值、FillListener 逐实体回调）与 `insertBatch` 一致。
+
+### 5.19 UNION / UNION ALL
+
+```java
+LightQuery.queryable(User.class).col(User::getStatus).eq(ACTIVE)
+    .unionAll(LightQuery.queryable(User.class).col(User::getStatus).eq(FROZEN))
+    .toList();
+```
+
+契约（测试固化，见 T27）：
+
+- 根查询渲染 `SELECT .. UNION [ALL] SELECT ..`；**排序与分页只允许作用在根查询**
+  （作用于整个复合结果，符合 SQL 语义）。
+- fail-fast（0.4.1 起）：partner 自带 orderBy / limit / offset / forUpdate 抛
+  SqlBuildException，提示从 partner 移除并把排序分页交给根查询；根与 partner
+  列数不一致抛 SqlBuildException（显式 select 按 selectExprs 计数，默认投影按
+  实体全列减 exclude 计数，双方均含各自口径）。
+- partner 可继续 union 形成链；各侧独立渲染自身逻辑删除过滤。
+
 ---
 ## 6. SQL 生成规则（SqlBuilder + Dialect）
 
@@ -647,7 +703,7 @@ LightQuery.queryable(User.class)
 | rightJoin | ✅ | ✅ | ✅ |
 | like ESCAPE 子句 | 依赖默认 `\`，不输出 | 显式输出 `ESCAPE '\'` | 显式输出 |
 | SEQUENCE nextval | ❌（抛 SqlBuildException） | `SELECT nextval('seq')` | `SELECT NEXT VALUE FOR "seq"` |
-| upsert / 序列等 | roadmap | roadmap | roadmap |
+| upsert | `INSERT .. ON DUPLICATE KEY UPDATE` | `INSERT .. ON CONFLICT .. DO UPDATE` | `MERGE INTO .. KEY ..`（2.x 常规模式不支持 ON CONFLICT / ON DUPLICATE KEY，实测见 T23） |
 
 0.4.0 起新增方言（§5.11 同款探测规则，按 JDBC 子协议 `:oracle:` / `:sqlserver:`）：
 
@@ -752,11 +808,12 @@ unchecked）——不新增自定义异常类型。
 | T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照（逗号风格 FROM 列表，ON 并入 WHERE）、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错 |
 | T21 | StrongTypingTest | 强类型单柄：`col(...)` 列柄在创建时锁定值类型，其上全部条件（相等/比较/文本/列对列、聚合终端、updatable 写入、JoinOn 常量族）在 H2 正例执行；断言与执行顺序无关；编不过的负例以文档注释固化（见类头 javadoc）；`like/setIncrement` 在错误类型列上的误用仅运行时由数据库暴露（见方法 javadoc） |
 | T22 | ConverterH2Test | JPA `@Convert`/`AttributeConverter`：insert 写入库值与 select 读回属性值往返、条件值同样经转换器、无 converter 类的 `@Convert` 启动报错 |
-| T23 | BatchUpsertH2Test | `insertBatch(batchSize)` 分批（7 条 batchSize=3 → 3 批）、upsert SQL 形态、H2 MySQL 模式下 upsert 不支持报错、`Consumer<Where>` 条件可复用 |
+| T23 | BatchUpsertH2Test | `insertBatch(batchSize)` 分批（7 条 batchSize=3 → 3 批）、三种方言 upsert 形态（0.4.1 修正：H2 2.x 仅支持 MERGE..KEY，不支持 ON CONFLICT / ON DUPLICATE KEY）、H2 真实执行：主键冲突转更新、空主键退化 insert 只触发 onInsert、非空主键触发 onInsert+onUpdate、`Consumer<Where>` 条件可复用 |
 | T24 | ExcludeH2Test | `exclude()`：单表 SELECT * 变显式列清单（不含排除列）、join 查询下同样生效 |
 | T25 | SqlLoggerH2Test | `SqlLogger` SPI：beforeExecute/afterExecute 回调（SQL、参数、耗时）及先后顺序、onError 在 SQL 异常时触发、未注册 logger 无副作用 |
+| T28 | LightQueryLoggersTest | SLF4J 适配器：三个回调的日志级别与内容（注入桩 Logger 断言）、无状态可复用 |
 | T26 | RawSqlH2Test | raw 逃生舱（§5.16）：sqlHint 渲染位置、selectRaw 别名与 Tuple label、whereRaw `?` 绑定与 AND 组合、groupByRaw 分组正确、orderByRaw 原样无方向后缀 |
-| T27 | UnionAndSaveOrUpdateTest | `union` 去重合并、`unionAll` 保留重复行、`saveOrUpdate` 按主键是否为空分流 insert/update |
+| T27 | UnionAndSaveOrUpdateTest | `union` 去重合并、`unionAll` 保留重复行、`saveOrUpdate` 按主键是否为空分流 insert/update、partner 带 orderBy/limit 拒绝与列数不符拒绝（0.4.1 fail-fast） |
 
 覆盖率门禁：JaCoCo core 指令覆盖 ≥ 85%，`sqlgen`/`meta` 包 ≥ 90%。
 
@@ -824,13 +881,13 @@ light-query-parent/
 |---|---|
 | 0.1.0 | 实体映射（JPA 注解）/ lambda 条件 / join / 子查询 / 聚合 / 逻辑删除 / 事务 / 方言 |
 | 0.2.0 | 静态门面 + 多数据源 / `@Version` 乐观锁 / SEQUENCE 主键 / 自连接（QueryTable）/ FillListener SPI / Spring Boot Starter |
+| 0.4.1 | `SqlLogger` 的 SLF4J 适配器（optional 依赖）/ upsert 补齐 FillListener 契约 / union partner fail-fast 校验 |
 | 0.4.0 | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 / update join·delete join / exclude() / raw SQL 逃生舱（sqlHint/selectRaw/whereRaw/groupByRaw/orderByRaw）/ `SqlLogger` SPI / JPA `@Convert` / upsert + `insertBatch(batchSize)` / UNION·UNION ALL / saveOrUpdate / boolean 前置条件重载（删除 when()）|
 
 ### 0.5.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
 
 | 特性 | 动机 | 说明 |
 |---|---|---|
-| SQL 日志 SLF4J 适配器 | 开箱即用的日志输出 | `SqlLogger` 已落地（T25），补默认 SLF4J 适配器，零依赖默认关闭 |
 | 自定义类型处理器 | MP `TypeHandler`，jOOQ Converter | JPA `AttributeConverter` 已透传（T22）；补自定义 `ValueConverter<V, D>` SPI |
 | 条件复用与组合 | jOOQ `Condition.and/or` 可组合 | `TypedColumn` 产物可缓存、跨查询复用（`ConditionGroup` 已是树，暴露组合 API）|
 | 审计拦截器 SPI | MP `MetaObjectHandler` / JPA `@PrePersist` | 操作类型 + 实体快照 + 时间戳，行级 before/after 钩子 |
