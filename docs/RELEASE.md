@@ -38,6 +38,6 @@ mvn -Prelease deploy
 ## 本地干跑（不上传）
 
 ```bash
-mvn -Prelease -DskipGpg=true package
+mvn -Prelease -Dgpg.skip=true package
 # 检查 target/ 下 jar、sources、javadoc 与 asc 签名是否齐全
 ```

@@ -14,14 +14,14 @@
 <dependency>
     <groupId>io.github.snowxuyu</groupId>
     <artifactId>light-query</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
 </dependency>
 
 <!-- Spring Boot 环境（可选）：自动装配 + Spring 事务对接 -->
 <dependency>
     <groupId>io.github.snowxuyu</groupId>
     <artifactId>light-query-spring-boot-starter</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 

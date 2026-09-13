@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-13
+
 ### Added
 - VO/record projection (v0.3 roadmap): `toList(Class<R>)` and
   `toPageResult(pageNo, pageSize, Class<R>)` map projected rows onto

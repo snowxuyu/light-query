@@ -824,8 +824,7 @@ light-query-parent/
 |---|---|
 | 0.1.0 | 实体映射（JPA 注解）/ lambda 条件 / join / 子查询 / 聚合 / 逻辑删除 / 事务 / 方言 |
 | 0.2.0 | 静态门面 + 多数据源 / `@Version` 乐观锁 / SEQUENCE 主键 / 自连接（QueryTable）/ FillListener SPI / Spring Boot Starter / update join / delete join |
-| 0.3.0（开发中） | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 / update join·delete join / exclude() |
-| 0.4.0（开发中） | raw SQL 逃生舱（sqlHint/selectRaw/whereRaw/groupByRaw/orderByRaw）/ `SqlLogger` SPI / JPA `@Convert` / upsert + `insertBatch(batchSize)` / UNION·UNION ALL / saveOrUpdate / boolean 前置条件重载（删除 when()）|
+| 0.4.0 | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 / update join·delete join / exclude() / raw SQL 逃生舱（sqlHint/selectRaw/whereRaw/groupByRaw/orderByRaw）/ `SqlLogger` SPI / JPA `@Convert` / upsert + `insertBatch(batchSize)` / UNION·UNION ALL / saveOrUpdate / boolean 前置条件重载（删除 when()）|
 
 ### 0.5.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
 
