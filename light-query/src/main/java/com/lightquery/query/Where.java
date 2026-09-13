@@ -91,14 +91,6 @@ public final class Where<T> {
     }
 
 
-    /**
-     * Applies {@code block} only when {@code condition} is true, e.g.
-     * {@code .or(w -> w.when(min != null, ww -> ww.col(User::getAge).ge(min)))}.
-     */
-    public Where<T> when(boolean condition, Consumer<Where<T>> block) {
-        if (condition) {
-            block.accept(this);
-        }
         return this;
     }
 

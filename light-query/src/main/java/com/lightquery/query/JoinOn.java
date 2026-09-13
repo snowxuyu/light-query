@@ -76,11 +76,6 @@ public final class JoinOn<A, B> {
     }
 
 
-    /** Applies {@code block} only when {@code condition} is true. */
-    public JoinOn<A, B> when(boolean condition, Consumer<JoinOn<A, B>> block) {
-        if (condition) {
-            block.accept(this);
-        }
         return this;
     }
 

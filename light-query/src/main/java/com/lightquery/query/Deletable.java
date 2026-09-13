@@ -119,16 +119,6 @@ public final class Deletable<T> {
     }
 
 
-    /**
-     * Applies {@code block} only when {@code condition} is true — dynamic
-     * query building without breaking the chain, e.g.
-     * {@code .when(name != null, q -> q.col(User::getName).eq(name))}.
-     */
-    public Deletable<T> when(boolean condition, Consumer<Deletable<T>> block) {
-        ensureOpen();
-        if (condition) {
-            block.accept(this);
-        }
         return this;
     }
 

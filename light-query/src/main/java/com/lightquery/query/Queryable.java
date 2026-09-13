@@ -117,16 +117,6 @@ public final class Queryable<T> {
     }
 
 
-    /**
-     * Applies {@code block} only when {@code condition} is true — dynamic
-     * query building without breaking the chain, e.g.
-     * {@code .when(name != null, q -> q.col(User::getName).eq(name))}.
-     */
-    public Queryable<T> when(boolean condition, Consumer<Queryable<T>> block) {
-        ensureOpen();
-        if (condition) {
-            block.accept(this);
-        }
         return this;
     }
 
