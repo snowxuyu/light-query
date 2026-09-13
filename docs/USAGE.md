@@ -231,6 +231,26 @@ List<User> rows = LightQuery.queryable(User.class)
     .toList();
 ```
 
+### 5.5 动态条件（按需过滤）
+
+`.when(condition, block)` 只在 condition 为 true 时追加条件——典型的动态查询场景：
+
+```java
+// Web 请求参数：可能为 null（用户没填筛选条件）
+String name = "frank";        // 可能是 null
+Integer minAge = null;        // 可能是 null
+Status status = Status.ACTIVE;
+
+List<User> rows = LightQuery.queryable(User.class)
+    .when(name != null,       q -> q.col(User::getName).like(name))
+    .when(minAge != null,     q -> q.col(User::getAge).ge(minAge))
+    .when(status != null,     q -> q.col(User::getStatus).eq(status))
+    .toList();
+// 只拼有值的条件：WHERE user_name LIKE '%frank%' AND status = 'ACTIVE'
+```
+
+`Where`（分组内）、`Updatable`、`Deletable`、`JoinOn` 上都有 `when()`。
+
 ### 5.5 排序
 
 ```java
