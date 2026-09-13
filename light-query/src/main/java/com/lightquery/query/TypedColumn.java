@@ -251,6 +251,24 @@ public class TypedColumn<B, V> {
         return builder;
     }
 
+    // ---------------------------------------------------------- conditional overloads
+
+    /** {@code col = value} only when {@code condition} is true. */
+    public B eq(boolean condition, V value) { return condition ? eq(value) : builder; }
+    /** {@code col <> value} only when {@code condition} is true. */
+    public B ne(boolean condition, V value) { return condition ? ne(value) : builder; }
+    public B gt(boolean condition, V value) { return condition ? gt(value) : builder; }
+    public B ge(boolean condition, V value) { return condition ? ge(value) : builder; }
+    public B lt(boolean condition, V value) { return condition ? lt(value) : builder; }
+    public B le(boolean condition, V value) { return condition ? le(value) : builder; }
+    public B like(boolean condition, String value) { return condition ? like(value) : builder; }
+    public B notLike(boolean condition, String value) { return condition ? notLike(value) : builder; }
+    public B startsWith(boolean condition, String value) { return condition ? startsWith(value) : builder; }
+    public B endsWith(boolean condition, String value) { return condition ? endsWith(value) : builder; }
+    public B in(boolean condition, Collection<V> values) { return condition ? in(values) : builder; }
+    public B notIn(boolean condition, Collection<V> values) { return condition ? notIn(values) : builder; }
+    public B between(boolean condition, V lo, V hi) { return condition ? between(lo, hi) : builder; }
+
     // ------------------------------------------------------------------ internals
 
     protected B add(Operator operator, Object value) {

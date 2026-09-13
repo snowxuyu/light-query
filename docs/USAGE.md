@@ -233,23 +233,32 @@ List<User> rows = LightQuery.queryable(User.class)
 
 ### 5.5 动态条件（按需过滤）
 
-`.when(condition, block)` 只在 condition 为 true 时追加条件——典型的动态查询场景：
+每个条件方法都有 **boolean 前置重载**——条件为 true 才追加，false 直接跳过：
 
 ```java
-// Web 请求参数：可能为 null（用户没填筛选条件）
-String name = "frank";        // 可能是 null
-Integer minAge = null;        // 可能是 null
+String name = "frank";        // Web 请求参数，可能为 null
+Integer minAge = null;        // 可能为 null
 Status status = Status.ACTIVE;
 
 List<User> rows = LightQuery.queryable(User.class)
-    .when(name != null,       q -> q.col(User::getName).like(name))
-    .when(minAge != null,     q -> q.col(User::getAge).ge(minAge))
-    .when(status != null,     q -> q.col(User::getStatus).eq(status))
+    .col(User::getName).like(name != null, name)
+    .col(User::getAge).ge(minAge != null, minAge)
+    .col(User::getStatus).eq(status != null, status)
     .toList();
 // 只拼有值的条件：WHERE user_name LIKE '%frank%' AND status = 'ACTIVE'
 ```
 
-`Where`（分组内）、`Updatable`、`Deletable`、`JoinOn` 上都有 `when()`。
+也可以用 `.when()` 做更复杂的条件判断（多个条件一起控制）：
+
+```java
+LightQuery.queryable(User.class)
+    .when(keyword != null && !keyword.isBlank(), q -> q
+        .col(User::getName).like(keyword)
+        .or().col(User::getRemark).like(keyword))
+    .toList();
+```
+
+`Where`（分组内）、`Updatable`、`Deletable`、`JoinOn` 上的条件方法同样支持 boolean 重载。
 
 ### 5.5 排序
 

@@ -225,6 +225,18 @@ public class UpdatableColumn<T, V> {
         return updatable;
     }
 
+    // ---------------------------------------------------------- conditional overloads
+
+    public Updatable<T> eq(boolean condition, V value) { return condition ? eq(value) : updatable; }
+    public Updatable<T> ne(boolean condition, V value) { return condition ? ne(value) : updatable; }
+    public Updatable<T> gt(boolean condition, V value) { return condition ? gt(value) : updatable; }
+    public Updatable<T> ge(boolean condition, V value) { return condition ? ge(value) : updatable; }
+    public Updatable<T> lt(boolean condition, V value) { return condition ? lt(value) : updatable; }
+    public Updatable<T> le(boolean condition, V value) { return condition ? le(value) : updatable; }
+    public Updatable<T> like(boolean condition, String value) { return condition ? like(value) : updatable; }
+    public Updatable<T> in(boolean condition, Collection<V> values) { return condition ? in(values) : updatable; }
+    public Updatable<T> between(boolean condition, V lo, V hi) { return condition ? between(lo, hi) : updatable; }
+
     // ------------------------------------------------------------------ internals
 
     protected void requireSetAllowed() {
