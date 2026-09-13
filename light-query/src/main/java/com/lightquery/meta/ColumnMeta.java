@@ -188,7 +188,9 @@ public final class ColumnMeta {
         if (value != null) {
             if (converter != null) {
                 value = convertByFieldConverterToDb(value);
-            } else {
+            } else if (enumKind == EnumKind.NONE) {
+                // enum fields convert through the enum storage kind; a global
+                // converter output would not be an enum and would break the cast
                 ValueConverter<Object, Object> global = Converters.forType(field.getType());
                 if (global != null) {
                     value = convertByGlobalToDb(global, value);
@@ -207,7 +209,7 @@ public final class ColumnMeta {
         if (converter != null) {
             return converter.convertToEntityAttribute(value);
         }
-        if (value != null) {
+        if (value != null && enumKind == EnumKind.NONE) {
             ValueConverter<Object, Object> global = Converters.forType(field.getType());
             if (global != null) {
                 return global.fromDatabase(value);

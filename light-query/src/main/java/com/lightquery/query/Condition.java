@@ -60,6 +60,14 @@ public final class Condition {
     }
 
     private Condition combine(Condition other, boolean or) {
+        // an empty tree renders to nothing, so AND/OR with it is the other side;
+        // this keeps skipped boolean conditions from entering the tree at all
+        if (group.getChildren().isEmpty()) {
+            return other;
+        }
+        if (other.group.getChildren().isEmpty()) {
+            return this;
+        }
         ConditionGroup parent = new ConditionGroup();
         parent.add(this.group);
         if (or) {

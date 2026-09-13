@@ -110,6 +110,9 @@ public final class Where<T> {
      * spec instance can be attached to any number of queries or groups.
      */
     public Where<T> where(com.lightquery.query.Condition spec) {
+        if (spec.group().getChildren().isEmpty()) {
+            return this;   // nothing to attach — never fake a condition
+        }
         if (spec.usesSubQueries()) {
             onSubQuery.run();
         }

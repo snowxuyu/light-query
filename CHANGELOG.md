@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-09-13
+
+### Fixed
+- **The full-table guard could be bypassed with an empty condition spec**
+  (found in the 0.5.0 audit): `updatable(...).where(allSkippedSpec)` counted
+  as "has conditions" because the empty tree was attached as a node, and the
+  UPDATE then ran against every non-deleted row without `allowFullTable()`.
+  Empty trees are now normalised away during `and`/`or` composition and
+  skipped at every attach point, so attaching nothing is never a condition.
+- **`Conditions.col(...).eq(null)` threw a NullPointerException**
+  (`List.of` rejects null elements); the eager `col()` path was unaffected.
+  The offline path now renders `IS NULL` like the eager one.
+- **`LightQuery.reset()` now also clears the global converter registry**
+  (previously only the fill listener and SQL logger — inconsistent semantics
+  and cross-test pollution).
+- **Enum fields ignore global converters**: a `ValueConverter` registered for
+  an enum type was applied before the enum storage conversion, producing a
+  `ClassCastException`; enum storage now owns the conversion (use a
+  field-level `@Convert` for custom enum storage).
+
 ## [0.5.0] — 2026-09-13
 
 ### Added

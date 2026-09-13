@@ -138,4 +138,38 @@ class ConditionCompositionH2Test {
         // ages 30/17/25/40 -> three adults
         assertEquals(3, rows.size());
     }
+
+    @Test
+    void allSkippedSpecDoesNotBypassTheFullTableGuard() {
+        TestDb h2 = freshDb("comp_guard");
+        // every condition in the spec is skipped -> the spec composes to nothing
+        com.lightquery.query.Condition skipped = com.lightquery.query.Conditions.col(User::getAge)
+                .ge(false, 100);
+        // the guard must still fire: attaching nothing is NOT a condition
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.lightquery.exception.SqlBuildException.class,
+                () -> LightQuery.updatable(User.class)
+                        .where(skipped)
+                        .col(User::getStatus).set(User.Status.FROZEN)
+                        .execute());
+        assertTrue(ex.getMessage().contains("allowFullTable"), ex.getMessage());
+
+        // an empty spec combined away by and() keeps the live side only
+        com.lightquery.query.Condition live = com.lightquery.query.Conditions.col(User::getName).eq("alice");
+        assertEquals(1, LightQuery.queryable(User.class).where(live.and(skipped)).count());
+    }
+
+    @Test
+    void eqNullViaCompositionRendersIsNull() {
+        TestDb h2 = freshDb("comp_null");
+        LightQuery.insert(h2.user("no-remark", User.Status.ACTIVE, 1, null, null, 0));
+        String sql = LightQuery.queryable(User.class)
+                .where(com.lightquery.query.Conditions.col(User::getRemark).eq(null))
+                .toSql();
+        assertTrue(sql.contains("IS NULL"), sql);
+        // freshDb seeds 4 users with a null remark + the one inserted here
+        assertEquals(5, LightQuery.queryable(User.class)
+                .where(com.lightquery.query.Conditions.col(User::getRemark).eq(null))
+                .count());
+    }
 }

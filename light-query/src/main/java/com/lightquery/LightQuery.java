@@ -217,7 +217,8 @@ public final class LightQuery {
     }
 
     /**
-     * Clears every registration (primary and named) and the fill listener.
+     * Clears every registration (primary and named), the fill listener, the
+     * SQL logger and the global converter registry.
      * Escape hatch for tests and container restarts — production code should
      * register once and never call this.
      */
@@ -228,6 +229,7 @@ public final class LightQuery {
             NAMED.clear();
             FillListeners.clear();
             SqlLoggers.set(null);
+            Converters.clear();
         }
     }
 

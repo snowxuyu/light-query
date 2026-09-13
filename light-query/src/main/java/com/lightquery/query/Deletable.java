@@ -140,6 +140,9 @@ public final class Deletable<T> {
      */
     public Deletable<T> where(com.lightquery.query.Condition spec) {
         ensureOpen();
+        if (spec.group().getChildren().isEmpty()) {
+            return this;   // nothing to attach — the full-table guard stays honest
+        }
         if (spec.usesSubQueries()) {
             model.markUsesSubQueries();
         }

@@ -1,5 +1,6 @@
 package com.lightquery;
 
+import com.lightquery.entity.User;
 import com.lightquery.entity.Wallet;
 import com.lightquery.exception.MappingException;
 import com.lightquery.support.TestDb;
@@ -132,5 +133,23 @@ class ConverterRegistryH2Test {
         LightQuery.clearConverters();
         assertThrows(Exception.class,
                 () -> LightQuery.insert(new Wallet("frank", new Wallet.Money(1L), null)));
+    }
+
+    @Test
+    void enumFieldsIgnoreGlobalConverters() {
+        // a converter for the enum type must not fire: enum storage owns the conversion
+        LightQuery.registerConverter(User.Status.class, new Wallet.ExplodingConverter());
+        com.lightquery.entity.User user = h2.user("enum-skip", User.Status.ACTIVE, 1, null, null, 0);
+        // would explode if the converter were applied to the Status property
+        com.lightquery.entity.User saved = LightQuery.insert(user);
+        assertEquals(User.Status.ACTIVE, saved.getStatus());
+    }
+
+    @Test
+    void resetClearsTheConverterRegistry() {
+        LightQuery.registerConverter(Wallet.Money.class, new Wallet.MoneyConverter());
+        LightQuery.reset();
+        // after reset the same type can be registered again without conflict
+        LightQuery.registerConverter(Wallet.Money.class, new Wallet.MoneyConverter());
     }
 }

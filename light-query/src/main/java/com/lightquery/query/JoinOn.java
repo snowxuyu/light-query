@@ -94,6 +94,9 @@ public final class JoinOn<A, B> {
      * resolve against both joined entities.
      */
     public JoinOn<A, B> where(com.lightquery.query.Condition spec) {
+        if (spec.group().getChildren().isEmpty()) {
+            return this;
+        }
         if (spec.usesSubQueries()) {
             onSubQuery.run();
         }

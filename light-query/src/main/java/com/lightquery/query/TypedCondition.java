@@ -237,8 +237,9 @@ public final class TypedCondition<V> {
     // ------------------------------------------------------------------ internals
 
     private Condition add(Operator operator, Object value) {
+        // singletonList, not List.of: a null bind value (eq(null) -> IS NULL) is legal
         return Condition.leaf(com.lightquery.query.model.Condition.of(
-                ref, operator, List.of(meta.toDbValue(value))), false);
+                ref, operator, java.util.Collections.singletonList(meta.toDbValue(value))), false);
     }
 
     private Condition addText(Operator operator, String value) {

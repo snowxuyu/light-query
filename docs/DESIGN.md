@@ -696,6 +696,8 @@ LightQuery.clearConverters();                                     // 测试用
   不经过 ColumnMeta，不生效（与 `@Convert` 一致）。
 - **null 直通**：全局转换器只在值非 null 时调用（`@Convert` 行为不变，
   由转换器自行处理 null）。
+- **枚举字段不走全局转换器**（0.5.1）：枚举的存取由 `@Enumerated` 存储策略负责，
+  全局转换器输出不是枚举会破坏后续转换；需要自定义枚举存储请用字段级 `@Convert`。
 - **重复注册同一类型抛 IllegalStateException**（消息指出已注册与修复方式：
   先 `clearConverters()`）。
 - 转换器抛异常包装为 `MappingException`（消息含字段与类型）。
@@ -725,6 +727,9 @@ LightQuery.deletable(User.class).where(spec).execute();
   报错。自连接用 `Conditions.col(TableColumn)`。
 - `and/or` 组合为新的不可变节点；`not()` 输出 `NOT (...)`（ConditionGroup 新增
   否定标记，渲染层支持）。同一 spec 挂多个查询互不影响（构建后不可变）。
+- **空树规范化**（0.5.1）：boolean 前置重载全部跳过的 spec 组合为空树，
+  `and/or` 与空树组合返回另一侧；挂载空树不产生任何条件——因此不构成
+  「已有条件」，全表保护（allowFullTable）保持诚实。
 - 挂载点：`Queryable/Updatable/Deletable/Where/JoinOn` 的 `where(Condition)`，
   spec 整体作为最外层 AND 组的一个子树；含子查询的 spec 挂载时对宿主模型
   `markUsesSubQueries`（别名渲染不变）。
