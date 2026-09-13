@@ -269,6 +269,22 @@ public class TypedColumn<B, V> {
     public B notIn(boolean condition, Collection<V> values) { return condition ? notIn(values) : builder; }
     public B between(boolean condition, V lo, V hi) { return condition ? between(lo, hi) : builder; }
 
+    // ---------------------------------------------------------- conditional overloads (cont.)
+
+    public B notBetween(boolean condition, V lo, V hi) { return condition ? notBetween(lo, hi) : builder; }
+    public B in(boolean condition, V... values) { return condition ? in(values) : builder; }
+    public B notIn(boolean condition, V... values) { return condition ? notIn(values) : builder; }
+    public B in(boolean condition, Queryable<?> subQuery) { return condition ? in(subQuery) : builder; }
+    public B notIn(boolean condition, Queryable<?> subQuery) { return condition ? notIn(subQuery) : builder; }
+    public B eqSubQuery(boolean condition, Queryable<?> subQuery) { return condition ? eqSubQuery(subQuery) : builder; }
+    public B neSubQuery(boolean condition, Queryable<?> subQuery) { return condition ? neSubQuery(subQuery) : builder; }
+    public B gtSubQuery(boolean condition, Queryable<?> subQuery) { return condition ? gtSubQuery(subQuery) : builder; }
+    public B geSubQuery(boolean condition, Queryable<?> subQuery) { return condition ? geSubQuery(subQuery) : builder; }
+    public B ltSubQuery(boolean condition, Queryable<?> subQuery) { return condition ? ltSubQuery(subQuery) : builder; }
+    public B leSubQuery(boolean condition, Queryable<?> subQuery) { return condition ? leSubQuery(subQuery) : builder; }
+    public B isNull(boolean condition) { return condition ? isNull() : builder; }
+    public B isNotNull(boolean condition) { return condition ? isNotNull() : builder; }
+
     // ------------------------------------------------------------------ internals
 
     protected B add(Operator operator, Object value) {

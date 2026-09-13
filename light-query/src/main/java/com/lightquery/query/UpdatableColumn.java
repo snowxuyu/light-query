@@ -236,6 +236,16 @@ public class UpdatableColumn<T, V> {
     public Updatable<T> like(boolean condition, String value) { return condition ? like(value) : updatable; }
     public Updatable<T> in(boolean condition, Collection<V> values) { return condition ? in(values) : updatable; }
     public Updatable<T> between(boolean condition, V lo, V hi) { return condition ? between(lo, hi) : updatable; }
+    public Updatable<T> notLike(boolean condition, String value) { return condition ? notLike(value) : updatable; }
+    public Updatable<T> startsWith(boolean condition, String value) { return condition ? startsWith(value) : updatable; }
+    public Updatable<T> endsWith(boolean condition, String value) { return condition ? endsWith(value) : updatable; }
+    public Updatable<T> notIn(boolean condition, Collection<V> values) { return condition ? notIn(values) : updatable; }
+    public Updatable<T> notBetween(boolean condition, V lo, V hi) { return condition ? notBetween(lo, hi) : updatable; }
+    public Updatable<T> isNull(boolean condition) { return condition ? isNull() : updatable; }
+    public Updatable<T> isNotNull(boolean condition) { return condition ? isNotNull() : updatable; }
+    public Updatable<T> set(boolean condition, V value) { return condition ? set(value) : updatable; }
+    public Updatable<T> setNull(boolean condition) { return condition ? setNull() : updatable; }
+    public Updatable<T> setIncrement(boolean condition, long delta) { return condition ? setIncrement(delta) : updatable; }
 
     // ------------------------------------------------------------------ internals
 
