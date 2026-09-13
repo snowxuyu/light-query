@@ -248,16 +248,6 @@ List<User> rows = LightQuery.queryable(User.class)
 // 只拼有值的条件：WHERE user_name LIKE '%test-user%' AND status = 'ACTIVE'
 ```
 
-也可以用 `.when()` 做更复杂的条件判断（多个条件一起控制）：
-
-```java
-LightQuery.queryable(User.class)
-    .when(keyword != null && !keyword.isBlank(), q -> q
-        .col(User::getName).like(keyword)
-        .or().col(User::getRemark).like(keyword))
-    .toList();
-```
-
 `Where`（分组内）、`Updatable`、`Deletable`、`JoinOn` 上的条件方法同样支持 boolean 重载。
 
 ### 5.5 排序
