@@ -22,7 +22,7 @@ light-query：面向 Java 21 的低学习成本、类型安全轻量 ORM。
 
 ```bash
 # 需要 JDK 21
-mvn verify        # 全量构建 + 157 个测试（T1-T21 矩阵）
+mvn verify        # 全量构建 + 183 个测试（T1-T27 矩阵）
 mvn test          # 仅测试
 ```
 
@@ -36,7 +36,7 @@ mvn test          # 仅测试
 
 | 文档 | 内容 |
 |---|---|
-| `docs/DESIGN.md` | 设计契约：API 签名、语义约定（null/空 IN/逻辑删除/全表保护）、别名规则、测试矩阵 T1-T10、Roadmap（§14） |
+| `docs/DESIGN.md` | 设计契约：API 签名、语义约定（null/空 IN/逻辑删除/全表保护）、别名规则、测试矩阵 T1-T27、Roadmap（§14） |
 | `docs/RELEASE.md` | Maven Central 发布手册（Central Portal namespace：`io.github.snowxuyu`） |
 | `CHANGELOG.md` | 按 Keep a Changelog 维护；用户可见变更必须更新 Unreleased 段 |
 

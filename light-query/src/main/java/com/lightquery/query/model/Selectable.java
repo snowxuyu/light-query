@@ -5,5 +5,5 @@ package com.lightquery.query.model;
  * GROUP BY / ORDER BY: a resolved column or an aggregate expression.
  * Sealed so the renderer can handle every variant exhaustively.
  */
-public sealed interface Selectable permits ColumnRef, Expr {
+public sealed interface Selectable permits ColumnRef, Expr, RawExpr {
 }

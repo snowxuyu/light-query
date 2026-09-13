@@ -9,6 +9,7 @@ import com.lightquery.query.model.JoinSpec;
 import com.lightquery.query.model.Operator;
 import com.lightquery.query.model.OrderBy;
 import com.lightquery.query.model.QueryModel;
+import com.lightquery.query.model.RawExpr;
 import com.lightquery.query.model.Selectable;
 import com.lightquery.query.model.TableRef;
 
@@ -203,7 +204,11 @@ public final class SqlBuilder {
         RenderContext ctx = new RenderContext(dialect);
         Scope scope = Scope.root(model, depth, parent);
 
-        StringBuilder sql = new StringBuilder("SELECT ");
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT ");
+        if (model.getSqlHint() != null && !model.getSqlHint().isBlank()) {
+            sql.append("/*+ ").append(model.getSqlHint()).append(" */ ");
+        }
         if (model.isDistinct() && !model.isExistsProbe()) {
             sql.append("DISTINCT ");
         }
@@ -307,9 +312,13 @@ public final class SqlBuilder {
     }
 
     private static CharSequence renderOrder(OrderBy order, Scope scope, RenderContext ctx, int depth) {
+        if (order instanceof OrderBy.ByRaw raw) {
+            return raw.sql();
+        }
         String expression = switch (order) {
             case OrderBy.ByExpr e -> renderSelectable(e.expr(), scope, ctx, depth, false);
             case OrderBy.ByAlias a -> ctx.dialect().quote(a.alias());
+            case OrderBy.ByRaw r -> r.sql();
         };
         return expression + (order.asc() ? " ASC" : " DESC");
     }
@@ -430,6 +439,11 @@ public final class SqlBuilder {
                 yield inSelectList && ref.outputLabel() != null
                         ? qualified + " AS " + ctx.dialect().quote(ref.outputLabel())
                         : qualified;
+            }
+            case RawExpr(var sql, var label) -> {
+                if (inSelectList && label != null)
+                    yield sql + " AS " + ctx.dialect().quote(label);
+                yield sql;
             }
             case Expr(var function, var argument, var distinct, var alias) -> {
                 String renderedArgument = argument == null ? "*" : (distinct ? "DISTINCT " : "")

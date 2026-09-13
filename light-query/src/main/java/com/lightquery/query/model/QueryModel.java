@@ -30,6 +30,7 @@ public final class QueryModel {
     private Long offset;
     private Long limit;
     private final List<String> excludedColumns = new ArrayList<>();
+    private String sqlHint;
     private final List<QueryModel> unionPartners = new ArrayList<>();
     private boolean unionAll;
     private boolean forUpdate;
@@ -231,6 +232,15 @@ public final class QueryModel {
     /** QueryModels combined with UNION / UNION ALL after this one. */
     public List<QueryModel> getUnionPartners() {
         return unionPartners;
+    }
+
+    /** SQL hint comment prepended to the statement (e.g. PolarDB/MySQL optimizer hint). */
+    public String getSqlHint() {
+        return sqlHint;
+    }
+
+    public void setSqlHint(String hint) {
+        this.sqlHint = hint;
     }
 
     /** Whether UNION ALL (duplicates kept) instead of UNION (deduplicated). */

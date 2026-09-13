@@ -12,7 +12,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** UNION / UNION ALL + saveOrUpdate. */
+/** T27 — UNION / UNION ALL + saveOrUpdate. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UnionAndSaveOrUpdateTest {
 

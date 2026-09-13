@@ -204,4 +204,32 @@ class SqlSnapshotTest {
                 + " GROUP BY `user_id` HAVING sum(`amount`) >= ?"
                 + " ORDER BY count(`id`) ASC | params=[10]", sql);
     }
+
+    @Test
+    void rawSqlEscapeHatchesBothDialects() {
+        // hint sits after the SELECT keyword; raw fragments render verbatim
+        // (no identifier quoting, no ASC/DESC on orderByRaw); whereRaw args bind
+        String mysql = db.queryable(User.class)
+                .sqlHint("INDEX(t_user idx_name)")
+                .selectRaw("DATE_FORMAT(create_time, '%Y-%m') AS month")
+                .whereRaw("age > ?", 40)
+                .groupByRaw("DATE_FORMAT(create_time, '%Y-%m')")
+                .orderByRaw("FIELD(status, 3, 1, 2)")
+                .toSql();
+        assertEquals("SELECT /*+ INDEX(t_user idx_name) */"
+                + " DATE_FORMAT(create_time, '%Y-%m') AS month FROM `t_user`"
+                + " WHERE (age > ?) AND `deleted` = ?"
+                + " GROUP BY DATE_FORMAT(create_time, '%Y-%m')"
+                + " ORDER BY FIELD(status, 3, 1, 2) | params=[40, 0]", mysql);
+
+        LightQuerySession pg = LightQuery.primary(h2.dataSource).dialect(new PostgreSqlDialect());
+        String pgSql = pg.queryable(User.class)
+                .sqlHint("SeqScan(t_user)")
+                .whereRaw("age > ?", 40)
+                .orderByRaw("random()")
+                .toSql();
+        assertEquals("SELECT /*+ SeqScan(t_user) */ * FROM \"t_user\""
+                + " WHERE (age > ?) AND \"deleted\" = ?"
+                + " ORDER BY random() | params=[40, 0]", pgSql);
+    }
 }

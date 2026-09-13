@@ -30,6 +30,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   OFFSET/FETCH pagination (neutral ORDER BY for SQL Server), LIKE ESCAPE and
   SEQUENCE support; JDBC URL auto-detection for both. Test matrix T19
   (`DialectShapeTest`).
+- `exclude()` (v0.3 roadmap): drop chosen properties from the projected
+  column list (`SELECT *` becomes an explicit list without them); ignored
+  after an explicit `select(...)`, works on joined queries too. Test matrix
+  T24 (`ExcludeH2Test`).
+- raw SQL escape hatches (v0.4 roadmap): `sqlHint` (rendered right after the
+  `SELECT` keyword, e.g. MySQL/PolarDB optimizer hints), `selectRaw`,
+  `whereRaw(sql, args...)` (verbatim fragment AND-combined into the WHERE
+  tree, values `?`-bound), `groupByRaw` and `orderByRaw` (rendered verbatim,
+  no ASC/DESC appended). Raw content is never escaped — documented as the
+  developer's responsibility. Test matrix T26 (`RawSqlH2Test`).
+- `union` / `unionAll` between `Queryable`s and session-level `saveOrUpdate`
+  (insert when the primary key is null, update otherwise). Test matrix T27
+  (`UnionAndSaveOrUpdateTest`).
+- Upsert (v0.4 roadmap): `LightQuery.upsert(entity)` renders
+  `ON DUPLICATE KEY UPDATE` (MySQL) / `ON CONFLICT DO UPDATE` (PG, H2);
+  unsupported dialects fail with guidance. `insertBatch(entities, batchSize)`
+  splits batches. Test matrix T23 (`BatchUpsertH2Test`).
+- JPA `@Convert` / `AttributeConverter` support (v0.4 roadmap): converter
+  applies transparently on write and read, including condition values.
+  Test matrix T22 (`ConverterH2Test`).
+- `SqlLogger` SPI (v0.4 roadmap): `LightQuery.setSqlLogger(...)` observes
+  every statement — `beforeExecute(sql, params)`, `afterExecute(sql, ms)`,
+  `onError(sql, params, exception)`. Test matrix T25 (`SqlLoggerH2Test`).
 
 ### Fixed
 - `Tuple` no longer fails with NullPointerException when a projected column
@@ -60,6 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `UPDATE t0 SET .. FROM a t0, b t1`; PostgreSQL unchanged
   `UPDATE .. FROM` / `DELETE .. USING`). `Dialect.JoinPieces` shrank
   accordingly (dropped `joinedTables`/`onConditions`).
+- **Breaking: `when(boolean)` removed from all builders.** Dynamic conditions
+  are expressed with boolean-first overloads on every condition method —
+  `.col(User::getName).like(name != null, name)` — which keep the condition
+  chained without wrapping lambdas.
 
 ## [0.2.0] — 2026-09-06
 

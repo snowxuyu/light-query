@@ -131,6 +131,40 @@ public final class Queryable<T> {
         return this;
     }
 
+    // ------------------------------------------------------------------ raw SQL escape hatches
+
+    /**
+     * Prepends a SQL hint comment to the statement, e.g. optimizer hints for
+     * PolarDB / MySQL: {@code .sqlHint("INDEX(t1 idx_name)")}.
+     * Rendered as {@code SELECT /*+ hint *&#47; ...}.
+     */
+    public Queryable<T> sqlHint(String hint) {
+        ensureOpen();
+        model.setSqlHint(hint);
+        return this;
+    }
+
+    /** Adds a raw expression to the SELECT list, e.g. {@code selectRaw("NOW() AS query_time")}. */
+    public Queryable<T> selectRaw(String expression) {
+        ensureOpen();
+        model.getSelectExprs().add(new com.lightquery.query.model.RawExpr(expression));
+        return this;
+    }
+
+    /** Adds a raw GROUP BY expression, e.g. {@code groupByRaw("DATE(created_at)")}. */
+    public Queryable<T> groupByRaw(String expression) {
+        ensureOpen();
+        model.getGroupBys().add(new com.lightquery.query.model.RawExpr(expression));
+        return this;
+    }
+
+    /** Adds a raw ORDER BY expression, e.g. {@code orderByRaw("FIELD(status, 3, 1, 2)")}. */
+    public Queryable<T> orderByRaw(String expression) {
+        ensureOpen();
+        model.getOrderBys().add(new OrderBy.ByRaw(expression));
+        return this;
+    }
+
     /** Adds a parenthesised AND group. */
     public Queryable<T> and(Consumer<Where<T>> group) {
         ensureOpen();

@@ -583,6 +583,36 @@ List<User> rows = LightQuery.queryable(User.class)
 - 单表渲染为无别名列清单；join 渲染为 `t0.col` 别名限定的根实体列（过滤排除列）。
 - 投影 `toList(Class)` 引用被排除的列 → MappingException（消息列出可用标签）。
 
+### 5.16 raw SQL 逃生舱（v0.4）：`sqlHint` / `selectRaw` / `whereRaw` / `groupByRaw` / `orderByRaw`
+
+类型安全 API 无法覆盖的数据库特有表达式（优化器 hint、PolarDB 注释、`DATE_FORMAT`、
+`FIELD(...)` 自定义排序等）从这里进入。框架对 raw 内容**原样输出、永不转义**——
+内容正确性由开发者负责；用户输入的值必须走 `whereRaw` 的 `?` 绑定，禁止拼进 SQL 字符串。
+
+```java
+LightQuery.queryable(User.class)
+    .sqlHint("INDEX(t_user idx_name)")        // → SELECT /*+ INDEX(t_user idx_name) */ ...
+    .selectRaw("COUNT(*) AS total")           // SELECT 列表原样追加（含 AS 别名）
+    .whereRaw("age > ?", 40)                  // WHERE 树中最外层 AND 组追加原样片段，40 走 ? 绑定
+    .groupByRaw("DATE(create_time)")          // GROUP BY 原样追加
+    .orderByRaw("FIELD(status, 3, 1, 2)")     // ORDER BY 原样输出，不追加 ASC/DESC
+    .toList();
+```
+
+契约（测试固化，见 T26）：
+
+- `sqlHint`：单条 hint 字符串，渲染在 `SELECT` 关键字之后（`SELECT /*+ ... */` 前缀形态），
+  MySQL / PolarDB 优化器才能识别；空串/空白不渲染。
+- `selectRaw`：`RawExpr`（实现 `Selectable`）进入 SELECT 列表，整串原样渲染；
+  别名写在 SQL 字符串内（`AS total`），Tuple 的 label 取自 JDBC 结果集元数据
+  （未加引号的别名大小写由数据库决定，如 H2 会转大写）。
+- `whereRaw(String sql, Object... args)`：片段作为最外层 AND 组的一个条件并入 WHERE 树
+  （与逻辑删除过滤、用户条件恒为 AND）；`args` 按顺序绑定到片段中的 `?`，个数不符运行时报错。
+- `groupByRaw` / `orderByRaw`：原样进入对应子句；`orderByRaw` 不追加方向后缀
+  （与 `orderBy(SFunction, asc)` 不同），方向写进表达式本身。
+- raw 片段中的标识符不经方言转义；在标识符大小写敏感的库（如 H2 建表带引号）中
+  需自行写与建表一致的引用形式。
+
 ---
 ## 6. SQL 生成规则（SqlBuilder + Dialect）
 
@@ -606,6 +636,7 @@ List<User> rows = LightQuery.queryable(User.class)
 - `firstOrNull`/`exists()`：`LIMIT 1`；`exists()` 投影固定 `SELECT 1`。
 - `IN` 空 → `1=0`，`NOT IN` 空 → `1=1`（测试固化）。
 - `like` 值转义：`\`→`\\`、`%`→`\%`、`_`→`\_` 后两侧加 `%`（MySQL 默认转义符 `\`；PG 文档提示需 `LIKE ... ESCAPE '\'`，由 Dialect 输出 ESCAPE 子句）。
+- raw 逃生舱（§5.16）：`sqlHint` 渲染在 `SELECT` 关键字之后；`orderByRaw` 原样输出不追加方向；其余 raw 片段原样并入对应子句，值一律 `?` 绑定。
 
 ### 6.3 方言差异表（Dialect 接口方法）
 
@@ -720,6 +751,12 @@ unchecked）——不新增自定义异常类型。
 | T19 | DialectShapeTest | Oracle/SQLServer 方言：分页子句、引号、无 ORDER BY 时补中性排序、LIKE ESCAPE、SEQUENCE 语法、JDBC URL 探测 |
 | T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照（逗号风格 FROM 列表，ON 并入 WHERE）、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错 |
 | T21 | StrongTypingTest | 强类型单柄：`col(...)` 列柄在创建时锁定值类型，其上全部条件（相等/比较/文本/列对列、聚合终端、updatable 写入、JoinOn 常量族）在 H2 正例执行；断言与执行顺序无关；编不过的负例以文档注释固化（见类头 javadoc）；`like/setIncrement` 在错误类型列上的误用仅运行时由数据库暴露（见方法 javadoc） |
+| T22 | ConverterH2Test | JPA `@Convert`/`AttributeConverter`：insert 写入库值与 select 读回属性值往返、条件值同样经转换器、无 converter 类的 `@Convert` 启动报错 |
+| T23 | BatchUpsertH2Test | `insertBatch(batchSize)` 分批（7 条 batchSize=3 → 3 批）、upsert SQL 形态、H2 MySQL 模式下 upsert 不支持报错、`Consumer<Where>` 条件可复用 |
+| T24 | ExcludeH2Test | `exclude()`：单表 SELECT * 变显式列清单（不含排除列）、join 查询下同样生效 |
+| T25 | SqlLoggerH2Test | `SqlLogger` SPI：beforeExecute/afterExecute 回调（SQL、参数、耗时）及先后顺序、onError 在 SQL 异常时触发、未注册 logger 无副作用 |
+| T26 | RawSqlH2Test | raw 逃生舱（§5.16）：sqlHint 渲染位置、selectRaw 别名与 Tuple label、whereRaw `?` 绑定与 AND 组合、groupByRaw 分组正确、orderByRaw 原样无方向后缀 |
+| T27 | UnionAndSaveOrUpdateTest | `union` 去重合并、`unionAll` 保留重复行、`saveOrUpdate` 按主键是否为空分流 insert/update |
 
 覆盖率门禁：JaCoCo core 指令覆盖 ≥ 85%，`sqlgen`/`meta` 包 ≥ 90%。
 
@@ -787,25 +824,25 @@ light-query-parent/
 |---|---|
 | 0.1.0 | 实体映射（JPA 注解）/ lambda 条件 / join / 子查询 / 聚合 / 逻辑删除 / 事务 / 方言 |
 | 0.2.0 | 静态门面 + 多数据源 / `@Version` 乐观锁 / SEQUENCE 主键 / 自连接（QueryTable）/ FillListener SPI / Spring Boot Starter / update join / delete join |
-| 0.3.0（开发中） | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 |
+| 0.3.0（开发中） | 强类型 col() 条件（编译期校验）/ VO·record 投影 / seek 逻辑分页 / Oracle·SQLServer 方言 / update join·delete join / exclude() |
+| 0.4.0（开发中） | raw SQL 逃生舱（sqlHint/selectRaw/whereRaw/groupByRaw/orderByRaw）/ `SqlLogger` SPI / JPA `@Convert` / upsert + `insertBatch(batchSize)` / UNION·UNION ALL / saveOrUpdate / boolean 前置条件重载（删除 when()）|
 
-### 0.4.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
+### 0.5.0 规划（对标 MyBatis-Plus / jOOQ 补短板）
 
 | 特性 | 动机 | 说明 |
 |---|---|---|
-| SQL 日志 SPI | MP/jOOQ 内置，排查问题必备 | `SqlLogger` 接口（before/after），默认 SLF4J 适配器，零依赖默认关闭 |
-| 自定义类型处理器 | MP `TypeHandler`，jOOQ Converter | JPA `AttributeConverter` 透传 + 自定义 `ValueConverter<V, D>` SPI |
-| 批量写入优化 | MP `saveBatch` 支持分批提交 | `insertBatch` 增加 `batchSize` 重载；upsert（MySQL `ON DUPLICATE KEY` / PG `ON CONFLICT`）|
+| SQL 日志 SLF4J 适配器 | 开箱即用的日志输出 | `SqlLogger` 已落地（T25），补默认 SLF4J 适配器，零依赖默认关闭 |
+| 自定义类型处理器 | MP `TypeHandler`，jOOQ Converter | JPA `AttributeConverter` 已透传（T22）；补自定义 `ValueConverter<V, D>` SPI |
 | 条件复用与组合 | jOOQ `Condition.and/or` 可组合 | `TypedColumn` 产物可缓存、跨查询复用（`ConditionGroup` 已是树，暴露组合 API）|
 | 审计拦截器 SPI | MP `MetaObjectHandler` / JPA `@PrePersist` | 操作类型 + 实体快照 + 时间戳，行级 before/after 钩子 |
 
-### 0.5.0+ 规划（中远期）
+### 0.6.0+ 规划（中远期）
 
 | 特性 | 动机 | 说明 |
 |---|---|---|
 | 关系映射 | 全部主流 ORM 都有 `@OneToMany` | `@Parent` / `@Children` 注解，级联加载（不级联写入——保持轻量）|
 | 达梦 / 金仓方言 | 信创需求 | 扩展 `Dialect` 接口即可 |
-| UNION / 窗口函数 / CTE | jOOQ 完整 SQL DSL | `Queryable.union(...)` / `rowNumber() OVER` / `WITH cte AS` |
+| 窗口函数 / CTE | jOOQ 完整 SQL DSL | `rowNumber() OVER` / `WITH cte AS`（UNION 已于 0.4.0 落地）|
 | 性能基准报告 | jOOQ 有 JMH 报告 | JMH 对比 JDBC / MyBatis-Plus / light-query |
 
 ### 1.0.0 规划

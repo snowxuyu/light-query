@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** T21 — SqlLogger SPI: observe SQL execution before/after/error. */
+/** T25 — SqlLogger SPI: observe SQL execution before/after/error. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SqlLoggerH2Test {
 

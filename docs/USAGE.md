@@ -250,7 +250,7 @@ List<User> rows = LightQuery.queryable(User.class)
 
 `Where`（分组内）、`Updatable`、`Deletable`、`JoinOn` 上的条件方法同样支持 boolean 重载。
 
-### 5.5 排序
+### 5.6 排序
 
 ```java
 // 单列
@@ -264,7 +264,7 @@ List<User> rows = LightQuery.queryable(User.class)
 .orderByDesc("total")
 ```
 
-### 5.6 分页
+### 5.7 分页
 
 两种方式，按场景选择：
 
@@ -292,7 +292,7 @@ List<User> page2 = LightQuery.queryable(User.class)
 // 多列排序：seekAfter(v1, v2) 与排序列一一对应，支持混合方向
 ```
 
-### 5.7 投影——只取需要的字段
+### 5.8 投影——只取需要的字段
 
 ```java
 // ① 排除敏感字段：SELECT * 变为显式列清单（不含 balance 和 remark）
@@ -316,7 +316,7 @@ List<UserSummary> summaries = LightQuery.queryable(User.class)
     .toList(UserSummary.class);
 ```
 
-### 5.8 聚合与分组
+### 5.9 聚合与分组
 
 ```java
 // 标量聚合终端
@@ -337,7 +337,7 @@ List<OrderStat> stats = LightQuery.queryable(Order.class)
     .toList(OrderStat.class);
 ```
 
-### 5.9 join
+### 5.10 join
 
 ```java
 // INNER JOIN：两个 order 匹配同一个 user → user 出现两次（标准 SQL 行为）
@@ -360,7 +360,7 @@ LightQuery.queryable(User.class)
     ...
 ```
 
-### 5.10 子查询
+### 5.11 子查询
 
 ```java
 // IN 子查询
@@ -385,7 +385,7 @@ List<User> users = LightQuery.queryable(User.class)
     .toList();
 ```
 
-### 5.11 自连接
+### 5.12 自连接
 
 同一实体出现多次时，用 `QueryTable` 命名每次出现：
 
@@ -403,12 +403,41 @@ List<Tuple> pairs = LightQuery.queryable(staff)
     .toTupleList();
 ```
 
-### 5.12 动态表名（分表）
+### 5.13 动态表名（分表）
 
 ```java
 LightQuery.queryable(User.class)
     .asTable("t_user_202401")   // 替换物理表名
     .toList();
+```
+
+### 5.14 raw SQL 逃生舱
+
+类型安全 API 覆盖不到的数据库特有写法（优化器 hint、`DATE_FORMAT`、`FIELD(...)` 自定义排序、
+PolarDB 特有注释等）从这里进入。**框架对 raw 内容原样输出、不做任何转义**——内容由开发者负责，
+用户输入的值必须走 `whereRaw` 的 `?` 绑定，禁止拼进 SQL 字符串。
+
+```java
+LightQuery.queryable(User.class)
+    .sqlHint("INDEX(t_user idx_name)")       // → SELECT /*+ INDEX(t_user idx_name) */ ...
+    .selectRaw("DATE_FORMAT(create_time, '%Y-%m') AS month")
+    .whereRaw("age > ?", 40)                 // 40 走 ? 绑定，与其它条件 AND 组合
+    .groupByRaw("DATE_FORMAT(create_time, '%Y-%m')")
+    .orderByRaw("FIELD(status, 3, 1, 2)")    // 原样输出，不追加 ASC/DESC
+    .toTupleList();
+```
+
+注意：raw 片段里的标识符不做方言转义；在标识符大小写敏感的库（如 H2 建表带引号）中
+要写与建表一致的引用形式。
+
+### 5.15 UNION / UNION ALL
+
+```java
+var active = LightQuery.queryable(User.class).col(User::getStatus).eq(Status.ACTIVE);
+var frozen = LightQuery.queryable(User.class).col(User::getStatus).eq(Status.FROZEN);
+
+active.union(frozen).toList();      // 去重
+active.unionAll(frozen).toList();   // 保留重复行
 ```
 
 ---
@@ -485,6 +514,18 @@ LightQuery.deletable(User.class)
     .allowFullTable()
     .execute();
 ```
+
+### 6.4 upsert 与 saveOrUpdate
+
+```java
+// upsert：唯一键冲突时转更新（MySQL ON DUPLICATE KEY / PG、H2 ON CONFLICT）
+LightQuery.upsert(user);
+
+// saveOrUpdate：主键为空走 insert，有主键先查存在则 update
+LightQuery.saveOrUpdate(user);
+```
+
+`insertBatch` 支持分批提交：`LightQuery.insertBatch(list, 500)`。
 
 ---
 
