@@ -805,7 +805,7 @@ unchecked）——不新增自定义异常类型。
 | T17 | ProjectionH2Test | VO/record 投影：全列按名匹配（含下划线/大小写归一）、聚合别名、POJO setter、枚举与数值转换、分页投影、缺组件列报错（列出可用标签） |
 | T18 | SeekPaginationH2Test | seek 分页：单列/多列混合方向遍历不重不漏、与用户条件 AND、无 orderBy / 值个数不符 / null 值报错 |
 | T19 | DialectShapeTest | Oracle/SQLServer 方言：分页子句、引号、无 ORDER BY 时补中性排序、LIKE ESCAPE、SEQUENCE 语法、JDBC URL 探测 |
-| T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照（逗号风格 FROM 列表，ON 并入 WHERE）、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错 |
+| T20 | UpdateJoinTest | update join / delete join：MySQL / SQL Server / PostgreSQL 三种语句形态快照（逗号风格 FROM 列表，ON 并入 WHERE）、SET 限定与自增限定、逻辑删除转 UPDATE join、physical 转 DELETE join、Oracle/H2 不支持报错、SET 目标限定、未 join 实体与重复 join 报错。SQL Server 的 `UPDATE [t0] SET [t0].[col]` 形态已经官方文档验证合法（UPDATE (Transact-SQL) 示例 L：`UPDATE sr SET sr.Name += ...`，别名限定 SET 列是文档示例形态） |
 | T21 | StrongTypingTest | 强类型单柄：`col(...)` 列柄在创建时锁定值类型，其上全部条件（相等/比较/文本/列对列、聚合终端、updatable 写入、JoinOn 常量族）在 H2 正例执行；断言与执行顺序无关；编不过的负例以文档注释固化（见类头 javadoc）；`like/setIncrement` 在错误类型列上的误用仅运行时由数据库暴露（见方法 javadoc） |
 | T22 | ConverterH2Test | JPA `@Convert`/`AttributeConverter`：insert 写入库值与 select 读回属性值往返、条件值同样经转换器、无 converter 类的 `@Convert` 启动报错 |
 | T23 | BatchUpsertH2Test | `insertBatch(batchSize)` 分批（7 条 batchSize=3 → 3 批）、三种方言 upsert 形态（0.4.1 修正：H2 2.x 仅支持 MERGE..KEY，不支持 ON CONFLICT / ON DUPLICATE KEY）、H2 真实执行：主键冲突转更新、空主键退化 insert 只触发 onInsert、非空主键触发 onInsert+onUpdate、`Consumer<Where>` 条件可复用 |
